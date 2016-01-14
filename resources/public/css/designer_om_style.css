@@ -1,0 +1,22 @@
+/* designer-om CSS */
+
+g.block {
+
+}
+
+rect.block {
+    fill: white;
+    stroke: black;
+    stroke-width: 2px;
+}
+
+circle.flowport {
+    fill: white;
+    stroke: black;
+    stroke-width: 2px;
+    r: 40px;
+}
+
+.block path {
+    stroke-width: 10px;
+}
