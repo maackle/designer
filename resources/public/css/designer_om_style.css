@@ -1,5 +1,8 @@
 /* designer-om CSS */
 
+.field {
+    border: 1px solid magenta;
+}
 g.block {
 
 }

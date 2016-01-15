@@ -28,7 +28,7 @@
 (defn mouse-xy [svg e]
   (let [top (.. svg -offsetParent -offsetTop)
         left (.. svg -offsetParent -offsetLeft)]
-    (inspect (merge-with - (mouse-xy* e) {:x left :y top}))))
+    (merge-with - (mouse-xy* e) {:x left :y top})))
 
 (defn drag-handlers
   [svg component]
@@ -54,6 +54,16 @@
       {:onMouseDown down
        })))
 
+(defn polar->rect
+  [r rad]
+  [(* r (js/Math.cos rad))
+   (* r (js/Math.sin rad))])
+
+(defn spline-string
+  [[x0 y0] [x1 y1]]
+  (str "M" x0 " " y0 " C " (- x0 100) " " y0 ", " (+ x1 100) " " y1 ", " x1 " " y1 ""))
+
+
 ;; -----------------------------------------------------------------------------
 
 (defui FlowPort
@@ -71,22 +81,22 @@
                   {})
   (render [this]
           (let [{cx :position/x cy :position/y rate :rate} (om/props this)
-                {:keys [svg-node]} (om/get-computed this)
+                {:keys [svg-node block-position]} (om/get-computed this)
                 {:keys [radius]} (:block params)
                 ]
             (sab/html
-              [:circle.flowport (merge
+              [:g
+               [:path {:stroke "black"
+                      :fill "transparent"
+                      :marker-end "url(#arrow)"
+                      :d (spline-string [cx cy] [(:x block-position) (:y block-position)])}]
+               [:circle.flowport (merge
                                   {:cx cx
                                    :cy cy
                                    :r radius}
-                                  (drag-handlers svg-node this))]))))
+                                  (drag-handlers svg-node this))]]))))
 
 (def make-flowport (om/factory FlowPort))
-
-(defn polar->rect
-  [r rad]
-  [(* r (js/Math.cos rad))
-   (* r (js/Math.sin rad))])
 
 (defui Block
   static om/Ident
@@ -95,7 +105,8 @@
 
   static om/IQuery
   (query [this]
-         [:db/id :position/x :position/y {:block/ports (om/get-query FlowPort)}])
+         [:db/id :position/x :position/y
+          {:block/ports (om/get-query FlowPort)}])
 
   Object
   (render
@@ -104,24 +115,26 @@
            x :position/x
            y :position/y
            id :db/id} (om/props this)
-          {:keys [width height]} (:block params)
+          {:keys [width height]} (:block (inspect params))
           {:keys [svg-node] :as computed} (om/get-computed this)
+          computed-props {:block-position {:x x :y y}
+                          :svg-node svg-node}
           {flowport-offset :offset} (:flowport params)
           num-ports (count ports)]
       (sab/html
-        [:g.block (merge {:transform (str "translate(" x ", " y ")")}
-                          (drag-handlers svg-node this))
+        [:g.block (merge {} (drag-handlers svg-node this))
          (for [[i port] (map-indexed vector ports)]
-           (let [[x y] (polar->rect flowport-offset (/ (* 2 js/Math.PI i) num-ports))]  ;; TODO only do if no position given already
+           (let [[x y] (polar->rect flowport-offset (/ (* 2 js/Math.PI i) num-ports))
+                 port (if (:position/x port)
+                        port
+                        (assoc port
+                          :position/x (+ x )
+                          :position/y (+ y )))]  ;; TODO only do if no position given already
              [:g
-              [:path {:stroke "black"
-                      :fill "transparent"
-                      :marker-end "url(#arrow)"
-                      :d (str "M" 0 " " 0 " C " -20 " " 0 ", " (+ x 20) " " y ", " x " " y "")}]
-              (make-flowport (om/computed port computed))
+              (make-flowport (om/computed port computed-props))
               ]))
-         [:rect.block {:x (- (/ width 2))
-                       :y (- (/ height 2))
+         [:rect.block {:x (+ x (- (/ width 2)))
+                       :y (+ y (- (/ height 2)))
                        :width width
                        :height height
                        }]]))))
@@ -143,8 +156,8 @@
                 {:keys [dom-node]} (om/get-state this)
                 ]
             (sab/html
-              [:svg.field {:width 400
-                           :height 400}
+              [:svg.field {:width 900
+                           :height 900}
                [:defs
                 [:marker {:id "arrow"
                           :markerWidth 4
