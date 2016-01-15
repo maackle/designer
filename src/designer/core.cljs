@@ -12,7 +12,8 @@
 
 
 (def initial-data
-  {:blocks [{:db/id 1
+  {:gui/drag nil
+   :blocks [{:db/id 1
              :block/name "Biodigester"
              :position/x 200
              :position/y 200

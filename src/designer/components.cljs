@@ -18,26 +18,37 @@
              :flowport {:radius 30
                         :offset 130}})
 
-(defn drag-handlers
-  [component]
-  (let []
-    (letfn [(get-svg [e] (.. e -target -nearestViewportElement)) ;; TODO: this apparently is deprecated
-            (move [e]
-                  (let [target (.. e -target)
-                        x (.. e -clientX)
-                        y (.. e -clientY)]
-                    (om/transact! component
-                                  `[(position/move ~{:position/x x
-                                                     :position/y y})])))
-            (up [e]
-                (events/unlisten (get-svg e) "mousemove" move))
+(defn get-svg [e] (.. e -target -nearestViewportElement)) ;; TODO: this apparently is deprecated
 
+(defn mouse-xy* [e]
+  (let []
+    {:x (.. e -clientX)
+     :y (.. e -clientY)}))
+
+(defn mouse-xy [svg e]
+  (let [top (.. svg -offsetParent -offsetTop)
+        left (.. svg -offsetParent -offsetLeft)]
+    (inspect (merge-with - (mouse-xy* e) {:x left :y top}))))
+
+(defn drag-handlers
+  [svg component]
+  (let []
+    (letfn [
+            (move [e]
+                  (. e stopPropagation)
+                  (let [target (.. e -target)
+                        xy (mouse-xy svg e)]
+                    (om/transact! component
+                                  `[(gui/move-element ~xy)])))
             (down [e]
                   (. e stopPropagation)
-                  (let [svg (get-svg e)]
+                  (let [
+                        xy (mouse-xy svg e)
+                        up #(events/unlisten svg "mousemove" move)]
+                    (om/transact! component
+                                  `[(gui/start-drag-element ~xy)])
                     (events/listen svg "mousemove" move)
-                    (events/listen js/document.body "mouseup"
-                                   #(events/unlisten svg "mousemove" move))))
+                    (events/listen js/document.body "mouseup" up)))
             ]
 
       {:onMouseDown down
@@ -60,7 +71,7 @@
                   {})
   (render [this]
           (let [{cx :position/x cy :position/y rate :rate} (om/props this)
-                {} (om/get-state this)
+                {:keys [svg-node]} (om/get-computed this)
                 {:keys [radius]} (:block params)
                 ]
             (sab/html
@@ -68,7 +79,7 @@
                                   {:cx cx
                                    :cy cy
                                    :r radius}
-                                  (drag-handlers this))]))))
+                                  (drag-handlers svg-node this))]))))
 
 (def make-flowport (om/factory FlowPort))
 
@@ -94,12 +105,12 @@
            y :position/y
            id :db/id} (om/props this)
           {:keys [width height]} (:block params)
-          {:keys [svg-node]} (om/get-computed this)
+          {:keys [svg-node] :as computed} (om/get-computed this)
           {flowport-offset :offset} (:flowport params)
           num-ports (count ports)]
       (sab/html
         [:g.block (merge {:transform (str "translate(" x ", " y ")")}
-                          (drag-handlers this))
+                          (drag-handlers svg-node this))
          (for [[i port] (map-indexed vector ports)]
            (let [[x y] (polar->rect flowport-offset (/ (* 2 js/Math.PI i) num-ports))]  ;; TODO only do if no position given already
              [:g
@@ -107,9 +118,7 @@
                       :fill "transparent"
                       :marker-end "url(#arrow)"
                       :d (str "M" 0 " " 0 " C " -20 " " 0 ", " (+ x 20) " " y ", " x " " y "")}]
-              (make-flowport (assoc port
-                              :position/x x
-                              :position/y y))
+              (make-flowport (om/computed port computed))
               ]))
          [:rect.block {:x (- (/ width 2))
                        :y (- (/ height 2))
@@ -126,9 +135,12 @@
          [{:blocks (om/get-query Block)}])
 
   Object
+  (componentDidMount [this]
+                     (om/update-state! this assoc :dom-node (om.dom/node this)))
+
   (render [this]
           (let [{:keys [blocks]} (om/props this)
-                ;; dom-node (om.dom/node this)
+                {:keys [dom-node]} (om/get-state this)
                 ]
             (sab/html
               [:svg.field {:width 400
@@ -147,6 +159,6 @@
 
                [:g.field
                 (map #(-> %
-                          ;; (om/computed {:svg-node dom-node})
+                          (om/computed {:svg-node dom-node})
                           make-block)
                      blocks)]]))))
