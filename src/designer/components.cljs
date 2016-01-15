@@ -28,7 +28,7 @@
         left (.. svg -offsetParent -offsetLeft)]
     (merge-with - (mouse-xy* e) {:x left :y top})))
 
-(defn drag-handlers
+(defn drag-start-handler
   [svg component]
   (let []
     (letfn [
@@ -48,9 +48,7 @@
                     (events/listen svg "mousemove" move)
                     (events/listen js/document.body "mouseup" up)))
             ]
-
-      {:onMouseDown down
-       })))
+      down)))
 
 (defn is-rect? [shape] (boolean (get shape :width)))
 (defn is-circle? [shape] (boolean (get shape :r)))
@@ -72,13 +70,29 @@
          intersect (merge-with - circle (polar->rect (+ r padding) angle))]
      (select-keys intersect [:x :y]))))
 
+#_(defn intersect-rect-ray  ;; TODO
+  ([rect ray-origin] (intersect-rect-ray rect ray-origin 0))
+  ([{cx :x cy :y w :width h :height :as rect} ray-origin padding]
+   (let [{dx :x dy :y} (merge-with - rect ray-origin)
+         angle (js/Math.atan2 dy dx)
+         intersect (merge-with - rect (polar->rect (+ r padding) angle))]
+     (select-keys intersect [:x :y]))))
+
+
+
 (defn spline-string
   [{cx0 :x cy0 :y :as shape1}
    {cx1 :x cy1 :y :as shape2}]
-  (let [{x0 :x y0 :y} (intersect-circle-ray shape2 shape1 40)
-        {x1 :x y1 :y} (intersect-circle-ray shape1 shape2 15)]
+
+  (letfn [(intercept
+            [from to arrow?]
+            (case (shape-type to)
+              :circle (intersect-circle-ray to from (if arrow? 15 0))
+              :rect (intersect-circle-ray to from (if arrow? 50 35))))]
+    (let [{x0 :x y0 :y} (intercept shape1 shape2 false)
+          {x1 :x y1 :y} (intercept shape2 shape1 true)]
     (str "M" x0 " " y0 " C " cx0 " " cy0 ", " cx1 " " cy1 ", " x1 " " y1 "")
-    ))
+    )))
 
 
 ;; -----------------------------------------------------------------------------
@@ -91,34 +105,35 @@
 
   static om/IQuery
   (query [this]
-         [:db/id :port/rate
+         [:db/id :port/rate :port/type
           {:shape [:x :y :r]}])
 
   Object
   (initLocalState [_]
                   {})
   (render [this]
-          (let [{shape :shape rate :port/rate} (om/props this)
+          (let [{shape :shape
+                 rate :port/rate
+                 type :port/type} (om/props this)
                 {:keys [x y r]} shape
                 {:keys [svg-node block-shape]} (om/get-computed this)
                 {:keys [radius]} (:block params)
                 ]
             (sab/html
               [:g
-               #_[:line {:stroke "black"
-                       :stroke-width 10
-                       :x1 0 :y1 0
-                       :x2 100 :y2 50
-                       :marker-end "url(#arrow)"}]
-               [:path {:stroke "black"
-                      :fill "transparent"
-                      :marker-end "url(#arrow)"
-                      :d (spline-string shape block-shape)}]
-               [:circle.flowport (merge
+               [:path (merge {:stroke "black"
+                              :fill "transparent"
+                              :marker-end "url(#arrow)"
+                              :d (case type
+                                   :output (spline-string block-shape shape)
+                                   :input (spline-string shape block-shape) )}
+                             )]
+               [:circle.flowport
                                   {:cx x
                                    :cy y
-                                   :r r}
-                                  (drag-handlers svg-node this))]]))))
+                                   :r r
+                                   :onMouseDown (drag-start-handler svg-node this)}
+                                  ]]))))
 
 (def make-flowport (om/factory FlowPort))
 
@@ -148,7 +163,7 @@
           {flowport-offset :offset} (:flowport params)
           num-ports (count ports)]
       (sab/html
-        [:g.block (merge {} (drag-handlers svg-node this))
+        [:g.block {:onMouseDown (drag-start-handler svg-node this)}
          (for [[i port] (map-indexed vector ports)]
            (let [{x :x y :y} (polar->rect flowport-offset (/ (* 2 js/Math.PI i) num-ports))
                  port (if (:shape/x port)
