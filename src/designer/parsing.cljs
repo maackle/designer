@@ -34,7 +34,9 @@
                        (merge-with - xy $)
                        (rename-keys $ {:x :position/x
                                        :y :position/y}))]
-    {:action #(swap! state update-in ref merge position)}))
+    {:action (fn [] (swap! state update-in ref #(-> %
+                                                    (assoc-in [:shape :x] x)
+                                                    (assoc-in [:shape :y] y))))}))
 
 (defmethod mutate :default
   [{:keys [state]} k _]

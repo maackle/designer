@@ -18,15 +18,13 @@
              :flowport {:radius 30
                         :offset 130}})
 
-(defn get-svg [e] (.. e -target -nearestViewportElement)) ;; TODO: this apparently is deprecated
-
 (defn mouse-xy* [e]
   (let []
     {:x (.. e -clientX)
      :y (.. e -clientY)}))
 
 (defn mouse-xy [svg e]
-  (let [top (.. svg -offsetParent -offsetTop)
+  (let [top (.. svg -offsetParent -offsetTop)  ;; offsetParent is not well-supported
         left (.. svg -offsetParent -offsetLeft)]
     (merge-with - (mouse-xy* e) {:x left :y top})))
 
@@ -54,14 +52,33 @@
       {:onMouseDown down
        })))
 
+(defn is-rect? [shape] (boolean (get shape :width)))
+(defn is-circle? [shape] (boolean (get shape :r)))
+(defn shape-type [shape] (cond
+                           (is-rect? shape) :rect
+                           (is-circle? shape) :circle
+                           :default nil))
+
 (defn polar->rect
   [r rad]
-  [(* r (js/Math.cos rad))
-   (* r (js/Math.sin rad))])
+  {:x (* r (js/Math.cos rad))
+   :y (* r (js/Math.sin rad))})
+
+(defn intersect-circle-ray
+  ([circle ray-origin] (intersect-circle-ray circle ray-origin 0))
+  ([{cx :x cy :y r :r :as circle} ray-origin padding]
+   (let [{dx :x dy :y} (merge-with - circle ray-origin)
+         angle (js/Math.atan2 dy dx)
+         intersect (merge-with - circle (polar->rect (+ r padding) angle))]
+     (select-keys intersect [:x :y]))))
 
 (defn spline-string
-  [[x0 y0] [x1 y1]]
-  (str "M" x0 " " y0 " C " (- x0 100) " " y0 ", " (+ x1 100) " " y1 ", " x1 " " y1 ""))
+  [{cx0 :x cy0 :y :as shape1}
+   {cx1 :x cy1 :y :as shape2}]
+  (let [{x0 :x y0 :y} (intersect-circle-ray shape2 shape1 40)
+        {x1 :x y1 :y} (intersect-circle-ray shape1 shape2 15)]
+    (str "M" x0 " " y0 " C " cx0 " " cy0 ", " cx1 " " cy1 ", " x1 " " y1 "")
+    ))
 
 
 ;; -----------------------------------------------------------------------------
@@ -74,26 +91,33 @@
 
   static om/IQuery
   (query [this]
-         [:db/id :position/x :position/y :port/rate])
+         [:db/id :port/rate
+          {:shape [:x :y :r]}])
 
   Object
   (initLocalState [_]
                   {})
   (render [this]
-          (let [{cx :position/x cy :position/y rate :rate} (om/props this)
-                {:keys [svg-node block-position]} (om/get-computed this)
+          (let [{shape :shape rate :port/rate} (om/props this)
+                {:keys [x y r]} shape
+                {:keys [svg-node block-shape]} (om/get-computed this)
                 {:keys [radius]} (:block params)
                 ]
             (sab/html
               [:g
+               #_[:line {:stroke "black"
+                       :stroke-width 10
+                       :x1 0 :y1 0
+                       :x2 100 :y2 50
+                       :marker-end "url(#arrow)"}]
                [:path {:stroke "black"
                       :fill "transparent"
                       :marker-end "url(#arrow)"
-                      :d (spline-string [cx cy] [(:x block-position) (:y block-position)])}]
+                      :d (spline-string shape block-shape)}]
                [:circle.flowport (merge
-                                  {:cx cx
-                                   :cy cy
-                                   :r radius}
+                                  {:cx x
+                                   :cy y
+                                   :r r}
                                   (drag-handlers svg-node this))]]))))
 
 (def make-flowport (om/factory FlowPort))
@@ -105,31 +129,33 @@
 
   static om/IQuery
   (query [this]
-         [:db/id :position/x :position/y
+         [:db/id
+          {:shape [:x :y :width :height]}
           {:block/ports (om/get-query FlowPort)}])
 
   Object
   (render
     [this]
     (let [{ports :block/ports
-           x :position/x
-           y :position/y
+           shape :shape
            id :db/id} (om/props this)
+
+          {x :x y :y} shape
           {:keys [width height]} (:block (inspect params))
           {:keys [svg-node] :as computed} (om/get-computed this)
-          computed-props {:block-position {:x x :y y}
+          computed-props {:block-shape shape
                           :svg-node svg-node}
           {flowport-offset :offset} (:flowport params)
           num-ports (count ports)]
       (sab/html
         [:g.block (merge {} (drag-handlers svg-node this))
          (for [[i port] (map-indexed vector ports)]
-           (let [[x y] (polar->rect flowport-offset (/ (* 2 js/Math.PI i) num-ports))
-                 port (if (:position/x port)
+           (let [{x :x y :y} (polar->rect flowport-offset (/ (* 2 js/Math.PI i) num-ports))
+                 port (if (:shape/x port)
                         port
                         (assoc port
-                          :position/x (+ x )
-                          :position/y (+ y )))]  ;; TODO only do if no position given already
+                          :shape/x (+ x )
+                          :shape/y (+ y )))]  ;; TODO only do if no position given already
              [:g
               (make-flowport (om/computed port computed-props))
               ]))
@@ -156,19 +182,26 @@
                 {:keys [dom-node]} (om/get-state this)
                 ]
             (sab/html
-              [:svg.field {:width 900
+              [:svg.field {:width 600
                            :height 900}
                [:defs
-                [:marker {:id "arrow"
-                          :markerWidth 4
-                          :markerHeight 4
-                          :viewBox "0 -5 10 10"
-                          :refX 5
-                          :refY 0
-                          :orient "auto"
-                          :markerUnits "strokeWidth"}
-                 [:path {:d "M0,-5L10,0L0,5"
-                         :fill "black"}]]]
+                {:dangerouslySetInnerHTML
+                 {:__html "
+                          <marker id=\"arrow\"
+                                  markerWidth=\"3\"
+                                  markerHeight=\"3\"
+                                  refX=\"5\"
+                                  refY=\"0\"
+                                  viewBox=\"0 -5 10 10\"
+                                  orient=\"auto\"
+                                  markerUnits=\"strokeWidth\">
+
+                            <path d=\"M0,-5L10,0L0,5\"
+                                  fill=\"black\" />
+
+                          </marker>
+                          "
+                          }}]
 
                [:g.field
                 (map #(-> %

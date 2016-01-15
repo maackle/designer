@@ -15,20 +15,31 @@
   {:gui/drag nil
    :blocks [{:db/id 1
              :block/name "Biodigester"
-             :position/x 200
-             :position/y 200
+             :shape {:x 200
+                     :y 200
+                     :width 100
+                     :height 50}
              :block/ports [{:db/id 1
                             :port/type :input
                             :port/name "biomass"
-                            :port/rate 20}
+                            :port/rate 20
+                            :shape {:x 0
+                                    :y 0
+                                    :r 40}}
                            {:db/id 2
                             :port/type :output
                             :port/name "biogas"
-                            :port/rate 10}
+                            :port/rate 10
+                            :shape {:x 0
+                                    :y 0
+                                    :r 40}}
                            {:db/id 3
                             :port/type :output
                             :port/name "biogas"
-                            :port/rate 10}]}]
+                            :port/rate 10
+                            :shape {:x 0
+                                    :y 0
+                                    :r 40}}]}]
    })
 
 (def reconciler (om/reconciler {:state initial-data
