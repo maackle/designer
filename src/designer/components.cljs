@@ -38,20 +38,24 @@
                   (let [target (.. e -target)
                         xy (mouse-xy svg e)]
                     (om/transact! component
-                                  (vec (concat
-                                    [`(gui/move-element ~xy)]
-                                    render-keys)))))
+                                  (into [] (concat
+                                             [`(gui/move-element ~xy)]
+                                             render-keys)))))
+            (up [e]
+                (om/transact! component
+                              (into [] (concat
+                                         [`(gui/end-drag-element)]
+                                         render-keys)))
+                (events/unlisten svg "mousemove" move))
             (down [e]
                   (. e stopPropagation)
-                  (let [
-                        xy (mouse-xy svg e)
-                        up #(events/unlisten svg "mousemove" move)]
+                  (let [xy (mouse-xy svg e)]
                     (om/transact! component
-                                  (vec (concat
-                                    [`(gui/start-drag-element ~xy)]
-                                    render-keys)))
+                                  (into [] (concat
+                                             [`(gui/start-drag-element ~xy)]
+                                             render-keys)))
                     (events/listen svg "mousemove" move)
-                    (events/listen js/document.body "mouseup" up)))
+                    (events/listenOnce js/document.body "mouseup" up)))
             ]
       down))))
 
@@ -188,12 +192,12 @@
   (query [this]
          [:db/id
           {:shape [:x :y :width :height]}
-          {:block/ports (om/get-query FlowPort)}])
+          {:block/flowports (om/get-query FlowPort)}])
 
   Object
   (render
     [this]
-    (let [{ports :block/ports
+    (let [{ports :block/flowports
            shape :shape
            id :db/id} (om/props this)
 
@@ -241,7 +245,7 @@
                 ]
             (sab/html
               [:svg.field {:width 600
-                           :height 900}
+                           :height 600}
                [:defs
                 {:dangerouslySetInnerHTML
                  {:__html "
