@@ -87,7 +87,6 @@
                                 )]
     (when (= 1 (count colliding-accounts))
       (let [[account] colliding-accounts]
-        (inspect account)
         (om/transact! component [`(flowport/add-to-account ~{:account account
                                                             :port port})
                                  ])))))

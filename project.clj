@@ -32,16 +32,17 @@
                        {:id "dev"
                         :source-paths ["src"]
                         :figwheel true
-                        :compiler {:main       "designer.core"
+                        :compiler {:main       "designer.app"
                                    :asset-path "js/compiled/out"
                                    :output-to  "resources/public/js/compiled/designer.js"
                                    :output-dir "resources/public/js/compiled/out"
                                    :source-map-timestamp true }}
                        {:id "prod"
                         :source-paths ["src"]
-                        :compiler {:main       "designer.core"
+                        :compiler {:main       "designer.app"
                                    :asset-path "js/compiled/out"
                                    :output-to  "resources/public/js/compiled/designer.js"
-                                   :optimizations :advanced}}]}
+                                   :optimizations :advanced
+                                   }}]}
 
   :figwheel { :css-dirs ["resources/public/css"] })
