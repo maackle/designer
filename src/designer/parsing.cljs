@@ -4,6 +4,7 @@
    [cljs.pprint :refer [pprint]]
    [sablono.core :as sab :include-macros true]
    [clojure.set :refer [rename-keys]]
+   [designer.components :as components]
    [designer.util :as util]
    [designer.geom :as geom])
   (:require-macros
@@ -36,8 +37,18 @@
                            )]
     (when-not (empty? other-colliding-ports)
       (let [combined-ports (conj other-colliding-ports port)]
-        (om/transact! component [`(account/generate {:ports ~combined-ports})
+        (om/transact! component [`(flowports/combine {:ports ~combined-ports})
                                  :blocks :accounts])))))
+
+(defn create-account-transaction
+  [account]
+  (let [ref [:account/by-id (:db/id account)]]
+    (fn [st]
+        (-> st
+            (assoc-in ref account)
+            (update :accounts conj ref)))))
+
+;; -----------------------------------------------------------------------------
 
 (defmulti read om/dispatch)
 
@@ -48,13 +59,25 @@
 
 (defmulti mutate om/dispatch)
 
-(defmethod mutate 'flowports/combine
-  [{:keys [state ref]} k {:keys [x y] :as xy}]
+(defmethod mutate 'account/create
+  [{:keys [state ref]} k {:keys [account]}]
   (let []
-    {:action (fn [] )}))
+    {:action (fn []
+               (swap! state (create-account-transaction account)))}))
 
-(defmethod mutate 'account/generate
-  [{:keys [state ref]} k {ports :ports}]
+(defmethod mutate 'flowport/add-to-account
+  [{:keys [state]} k {:keys [account port]}]
+  (let [account-ref [:account/by-id (:db/id account)]]
+    {:action (fn []
+               (swap! state update-in
+                      [:flowport/by-id (:db/id port)]
+                      (fn [st] (-> st
+                                   (assoc-in [:flowport/account] account-ref)
+                                   (update :shape #(merge % {:x nil :y nil}))))))}))
+
+
+(defmethod mutate 'flowports/combine
+  [{:keys [state ref component]} k {ports :ports}]
   (let [st @state
         num-ports (count ports)
         divisor {:x num-ports :y num-ports}
@@ -71,12 +94,9 @@
                          :y (:y centroid)
                          :r 60}}]
     {:action (fn []
-               (swap! state assoc-in account-ref account)
-               (swap! state update :accounts conj account-ref)
+               (om/transact! component [`(account/create ~{:account account})])
                (doseq [port ports]
-                 (swap! state update-in [:flowport/by-id (:db/id port)] (fn [st](-> st
-                                                                                    (assoc-in [:flowport/account] account-ref)
-                                                                                    (update :shape #(merge % {:x nil :y nil})))))))}))
+                 (om/transact! component [`(flowport/add-to-account ~{:account account :port port})])))}))
 
 (defmethod mutate 'gui/start-drag-element
   [{:keys [state ref]} k {:keys [x y] :as xy}]

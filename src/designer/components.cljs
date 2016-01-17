@@ -230,3 +230,5 @@
                   (-> account
                       (om/computed {:svg-node dom-node})
                       make-account))]]))))
+
+(def Root Field)
