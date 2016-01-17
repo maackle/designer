@@ -25,7 +25,7 @@
   (filter #(->> % :shape (collide? shape)) objects))
 
 
-(defn combine-ports!
+(defn- combine-ports!
   [ports]
   (let [num-ports (count ports)
         divisor {:x num-ports :y num-ports}
@@ -48,7 +48,7 @@
         (om/transact! core/reconciler [`(flowport/add-to-account ~{:account account :port port})
                                        :blocks :accounts])))))
 
-(defn do-port-port-intersection!
+(defn- do-port-port-intersections!
   [st component port-ref]
   (let [;; could use: (om/db->tree [{:block/flowports [:shape :flowport/name]}] (get st :blocks) st)
         port (get-in st port-ref)
@@ -61,10 +61,25 @@
                            (filter-colliders geom/circles-collide? port-shape)
                            )]
     (when-not (empty? other-colliding-ports)
-      (let [combined-ports (conj other-colliding-ports port)]
-        (combine-ports! combined-ports)))))
+      (let [colliding-ports (conj other-colliding-ports port)]
+        (combine-ports! colliding-ports)))))
 
-(defn create-account-transaction
+(defn- do-port-account-intersection!
+  [st component port-ref]
+  (let [port (get-in st port-ref)
+        port-shape (:shape port)
+        accounts (->> st :accounts (resolve-refs st))
+        colliding-accounts (->> accounts
+                                (filter-colliders geom/circles-collide? port-shape)
+                                )]
+    (when (= 1 (count colliding-accounts))
+      (let [[account] colliding-accounts]
+        (inspect account)
+        (om/transact! component [`(flowport/add-to-account ~{:account account
+                                                            :port port})
+                                 ])))))
+
+(defn- create-account-transaction
   [account]
   (let [ref [:account/by-id (:db/id account)]]
     (fn [st]
@@ -110,8 +125,8 @@
     {:action (fn []
                (when is-flowport?
                  (when-not
-                   (do-port-port-intersection! st component ref)
-                   #_(do-port-account-intersection! st component ref)))
+                   (do-port-port-intersections! st component ref)
+                   (do-port-account-intersection! st component ref)))
                (swap! state assoc :gui/drag nil)
              )}))
 
