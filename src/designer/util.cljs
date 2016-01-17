@@ -2,6 +2,7 @@
   (:require
     [cljs.pprint :refer [pprint]]
     [om.next :as om  :refer-macros [defui]]
+    [cljs-uuid-utils.core :as uuid]
     [cljs.core.async :as async :refer [<! >! put! chan close!]]
     [goog.net.XhrIo :as xhr])
   (:require-macros
@@ -10,6 +11,8 @@
            [goog.net Jsonp]))
 
 (def sym->str (comp #(subs % 1) str))
+
+(def rand-uuid uuid/make-random-uuid)
 
 (defn input-assoc-in
   [component ks]

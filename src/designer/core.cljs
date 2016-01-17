@@ -13,14 +13,9 @@
 
 (def initial-data
   {:gui/drag nil
-   :account/by-id {"water" {:db/id "water"
-                            :account/name "Water"
-                            :shape {:x 300
-                                    :y 300
-                                    :r 60}
-                            }}
    :blocks [[:block/by-id 1]]
    :accounts []
+   :account/by-id {}
    :block/by-id {1 {:db/id 1
                     :block/name "Biodigester"
                     :shape {:x 200
@@ -65,12 +60,7 @@
   reconciler
   {:inspect-data true})
 
-(defcard state app-state)
-
-#_(defcard app-test-2
-  (dc/om-next-root Field reconciler)
-  {:inspect-data true})
-
+#_(defcard state app-state)
 
 
 (defn main []

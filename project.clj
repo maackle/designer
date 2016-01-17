@@ -9,6 +9,7 @@
                  [devcards "0.2.1-4"]
                  [sablono "0.4.0"]
                  [org.omcljs/om "1.0.0-alpha26"]
+                 [com.lucasbradstreet/cljs-uuid-utils "1.0.2"]
                  ]
 
   :plugins [[lein-cljsbuild "1.1.1"]
