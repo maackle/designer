@@ -1,11 +1,11 @@
 (ns designer.components
   (:require
-   [om.next :as om  :refer-macros [defui]]
-   [om.dom]
-   [sablono.core :as sab :include-macros true]
-   [designer.util :refer []]
-   [goog.events :as events]
-   [goog.dom :as dom])
+    [om.next :as om  :refer-macros [defui]]
+    [om.dom]
+    [sablono.core :as sab :include-macros true]
+    [designer.util :refer []]
+    [goog.events :as events]
+    [goog.dom :as dom])
   (:require-macros
     [designer.macros :refer [inspect inspect-with]]
     [devcards.core :as dc :refer [defcard deftest]]))
@@ -29,26 +29,31 @@
     (merge-with - (mouse-xy* e) {:x left :y top})))
 
 (defn drag-start-handler
-  [svg component]
-  (let []
+  ([svg component] (drag-start-handler svg component []))
+  ([svg component render-keys]
+   (let []
     (letfn [
             (move [e]
                   (. e stopPropagation)
                   (let [target (.. e -target)
                         xy (mouse-xy svg e)]
                     (om/transact! component
-                                  `[(gui/move-element ~xy)])))
+                                  (vec (concat
+                                    [`(gui/move-element ~xy)]
+                                    render-keys)))))
             (down [e]
                   (. e stopPropagation)
                   (let [
                         xy (mouse-xy svg e)
                         up #(events/unlisten svg "mousemove" move)]
                     (om/transact! component
-                                  `[(gui/start-drag-element ~xy)])
+                                  (vec (concat
+                                    [`(gui/start-drag-element ~xy)]
+                                    render-keys)))
                     (events/listen svg "mousemove" move)
                     (events/listen js/document.body "mouseup" up)))
             ]
-      down)))
+      down))))
 
 (defn is-rect? [shape] (boolean (get shape :width)))
 (defn is-circle? [shape] (boolean (get shape :r)))
@@ -71,12 +76,12 @@
      (select-keys intersect [:x :y]))))
 
 #_(defn intersect-rect-ray  ;; TODO
-  ([rect ray-origin] (intersect-rect-ray rect ray-origin 0))
-  ([{cx :x cy :y w :width h :height :as rect} ray-origin padding]
-   (let [{dx :x dy :y} (merge-with - rect ray-origin)
-         angle (js/Math.atan2 dy dx)
-         intersect (merge-with - rect (polar->rect (+ r padding) angle))]
-     (select-keys intersect [:x :y]))))
+    ([rect ray-origin] (intersect-rect-ray rect ray-origin 0))
+    ([{cx :x cy :y w :width h :height :as rect} ray-origin padding]
+     (let [{dx :x dy :y} (merge-with - rect ray-origin)
+           angle (js/Math.atan2 dy dx)
+           intersect (merge-with - rect (polar->rect (+ r padding) angle))]
+       (select-keys intersect [:x :y]))))
 
 
 
@@ -91,11 +96,39 @@
               :rect (intersect-circle-ray to from (if arrow? 50 35))))]
     (let [{x0 :x y0 :y} (intercept shape1 shape2 false)
           {x1 :x y1 :y} (intercept shape2 shape1 true)]
-    (str "M" x0 " " y0 " C " cx0 " " cy0 ", " cx1 " " cy1 ", " x1 " " y1 "")
-    )))
+      (str "M" x0 " " y0 " C " cx0 " " cy0 ", " cx1 " " cy1 ", " x1 " " y1 "")
+      )))
 
 
 ;; -----------------------------------------------------------------------------
+
+(defui Account
+
+  static om/Ident
+  (ident [this {:keys [db/id]}]
+         [:account/by-id id])
+
+  static om/IQuery
+  (query [this]
+         [:db/id :account/name
+          {:shape [:x :y :r]}])
+
+  Object
+  (render [this]
+          (let [{shape :shape
+                 :as props} (om/props this)
+                {:keys [x y r]} shape
+                {:keys [svg-node]} (om/get-computed this)
+                ]
+            (sab/html
+              [:circle.account
+               {:cx x
+                :cy y
+                :r r
+                :onMouseDown (drag-start-handler svg-node this [:blocks])}])))
+  )
+
+(def make-account (om/factory Account))
 
 (defui FlowPort
 
@@ -105,7 +138,8 @@
 
   static om/IQuery
   (query [this]
-         [:db/id :port/rate :port/type
+         [:db/id :flowport/rate :flowport/type
+          {:flowport/account (om/get-query Account)}
           {:shape [:x :y :r]}])
 
   Object
@@ -113,27 +147,35 @@
                   {})
   (render [this]
           (let [{shape :shape
-                 rate :port/rate
-                 type :port/type} (om/props this)
+                 rate :flowport/rate
+                 type :flowport/type
+                 account :flowport/account
+                 :as props} (om/props this)
                 {:keys [x y r]} shape
                 {:keys [svg-node block-shape]} (om/get-computed this)
                 {:keys [radius]} (:block params)
+                {account-shape :shape} account
+                spline (let [sh (if-not (empty? account)
+                                  account-shape
+                                  shape)]
+                         (case type
+                           :output (spline-string block-shape sh)
+                           :input (spline-string sh block-shape)))
                 ]
             (sab/html
               [:g
                [:path (merge {:stroke "black"
                               :fill "transparent"
                               :marker-end "url(#arrow)"
-                              :d (case type
-                                   :output (spline-string block-shape shape)
-                                   :input (spline-string shape block-shape) )}
+                              :d spline}
                              )]
-               [:circle.flowport
-                                  {:cx x
-                                   :cy y
-                                   :r r
-                                   :onMouseDown (drag-start-handler svg-node this)}
-                                  ]]))))
+               (when-not account
+                 [:circle.flowport
+                  {:cx x
+                   :cy y
+                   :r r
+                   :onMouseDown (drag-start-handler svg-node this [])}
+                  ])]))))
 
 (def make-flowport (om/factory FlowPort))
 
@@ -156,14 +198,14 @@
            id :db/id} (om/props this)
 
           {x :x y :y} shape
-          {:keys [width height]} (:block (inspect params))
+          {:keys [width height]} (:block params)  ;; todo get directly
           {:keys [svg-node] :as computed} (om/get-computed this)
           computed-props {:block-shape shape
                           :svg-node svg-node}
           {flowport-offset :offset} (:flowport params)
           num-ports (count ports)]
       (sab/html
-        [:g.block {:onMouseDown (drag-start-handler svg-node this)}
+        [:g.block {:onMouseDown (drag-start-handler svg-node this [])}
          (for [[i port] (map-indexed vector ports)]
            (let [{x :x y :y} (polar->rect flowport-offset (/ (* 2 js/Math.PI i) num-ports))
                  port (if (:shape/x port)
@@ -186,14 +228,15 @@
 
   static om/IQuery
   (query [_]
-         [{:blocks (om/get-query Block)}])
+         [{:blocks (om/get-query Block)}
+          {:accounts (om/get-query Account)}])
 
   Object
   (componentDidMount [this]
                      (om/update-state! this assoc :dom-node (om.dom/node this)))
 
   (render [this]
-          (let [{:keys [blocks]} (om/props this)
+          (let [{:keys [blocks accounts]} (om/props this)
                 {:keys [dom-node]} (om/get-state this)
                 ]
             (sab/html
@@ -203,23 +246,27 @@
                 {:dangerouslySetInnerHTML
                  {:__html "
                           <marker id=\"arrow\"
-                                  markerWidth=\"3\"
-                                  markerHeight=\"3\"
-                                  refX=\"5\"
-                                  refY=\"0\"
-                                  viewBox=\"0 -5 10 10\"
-                                  orient=\"auto\"
-                                  markerUnits=\"strokeWidth\">
+                          markerWidth=\"3\"
+                          markerHeight=\"3\"
+                          refX=\"5\"
+                          refY=\"0\"
+                          viewBox=\"0 -5 10 10\"
+                          orient=\"auto\"
+                          markerUnits=\"strokeWidth\">
 
-                            <path d=\"M0,-5L10,0L0,5\"
-                                  fill=\"black\" />
+                          <path d=\"M0,-5L10,0L0,5\"
+                          fill=\"black\" />
 
                           </marker>
                           "
                           }}]
 
                [:g.field
-                (map #(-> %
-                          (om/computed {:svg-node dom-node})
-                          make-block)
-                     blocks)]]))))
+                (for [block blocks]
+                  (-> block
+                      (om/computed {:svg-node dom-node})
+                      make-block) )
+                (for [account accounts]
+                  (-> account
+                      (om/computed {:svg-node dom-node})
+                      make-account))]]))))

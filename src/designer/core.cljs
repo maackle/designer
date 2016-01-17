@@ -13,39 +13,52 @@
 
 (def initial-data
   {:gui/drag nil
-   :blocks [{:db/id 1
-             :block/name "Biodigester"
-             :shape {:x 200
-                     :y 200
-                     :width 100
-                     :height 50}
-             :block/ports [{:db/id 1
-                            :port/type :input
-                            :port/name "biomass"
-                            :port/rate 20
-                            :shape {:x 0
-                                    :y 0
-                                    :r 40}}
-                           {:db/id 2
-                            :port/type :output
-                            :port/name "biogas"
-                            :port/rate 10
-                            :shape {:x 0
-                                    :y 0
-                                    :r 40}}
-                           {:db/id 3
-                            :port/type :output
-                            :port/name "biogas"
-                            :port/rate 10
-                            :shape {:x 0
-                                    :y 0
-                                    :r 40}}]}]
+   :account/by-id {"water" {:db/id "water"
+                            :account/name "Water"
+                            :shape {:x 300
+                                    :y 300
+                                    :r 60}
+                            }}
+   :blocks [[:block/by-id 1]]
+   :accounts [[:account/by-id "water"]]
+   :block/by-id {1 {:db/id 1
+                    :block/name "Biodigester"
+                    :shape {:x 200
+                            :y 200
+                            :width 100
+                            :height 50}
+                    :block/ports [[:flowport/by-id 1]
+                                  [:flowport/by-id 2]
+                                  [:flowport/by-id 3]]}}
+   :flowport/by-id {1 {:db/id 1
+                       :flowport/type :input
+                       :flowport/name "biomass"
+                       :flowport/rate 20
+                       :flowport/account [:account/by-id "water"]
+                       :shape {:x 100
+                               :y 50
+                               :r 40}}
+                    2 {:db/id 2
+                       :flowport/type :output
+                       :flowport/name "biogas"
+                       :flowport/rate 10
+                       :flowport/account [:account/by-id "water"]
+                       :shape {:x 200
+                               :y 50
+                               :r 40}}
+                    3 {:db/id 3
+                       :flowport/type :output
+                       :flowport/name "biogas"
+                       :flowport/rate 10
+                       :shape {:x 150
+                               :y 400
+                               :r 40}}}
    })
 
-(def reconciler (om/reconciler {:state initial-data
+(def reconciler (om/reconciler {:state (atom initial-data)
                                 :parser parser}))
 
-(defcard-om-next first-card
+(defcard-om-next app-test
   Field
   reconciler
   {:inspect-data true})

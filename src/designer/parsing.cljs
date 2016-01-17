@@ -29,7 +29,7 @@
 (defmethod mutate 'gui/move-element
   [{:keys [state ref]} k {:keys [x y] :as xy}]
   (let [st @state
-        origin  {:x 0 :y 0} #_(get-in st [:gui/drag :origin])
+        origin  {:x 0 :y 0} ;; #_(get-in st [:gui/drag :origin])
         position (as-> origin $
                        (merge-with - xy $)
                        (rename-keys $ {:x :position/x
