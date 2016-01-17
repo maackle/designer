@@ -5,6 +5,7 @@
    [sablono.core :as sab :include-macros true]
    [clojure.set :refer [rename-keys]]
    [designer.components :as components]
+   [designer.core :as core :refer [reader mutator]]
    [designer.util :as util]
    [designer.geom :as geom])
   (:require-macros
@@ -23,6 +24,30 @@
   [collide? shape objects]
   (filter #(->> % :shape (collide? shape)) objects))
 
+
+(defn combine-ports!
+  [ports]
+  (let [num-ports (count ports)
+        divisor {:x num-ports :y num-ports}
+        centroid (as-> ports $
+                      (map :shape $)
+                      (apply merge-with + $)
+                      (merge-with / $ divisor))
+        account-name (-> ports first :flowport/name)
+        account-id (util/rand-uuid)
+        account-ref [:account/by-id account-id]
+        account {:db/id account-id
+                 :account/name account-name
+                 :shape {:x (:x centroid)
+                         :y (:y centroid)
+                         :r 60}}]
+    (do
+      (om/transact! core/reconciler [`(account/create ~{:account account})
+                                     :blocks :accounts])
+      (doseq [port ports]
+        (om/transact! core/reconciler [`(flowport/add-to-account ~{:account account :port port})
+                                       :blocks :accounts])))))
+
 (defn do-port-port-intersection!
   [st component port-ref]
   (let [;; could use: (om/db->tree [{:block/flowports [:shape :flowport/name]}] (get st :blocks) st)
@@ -37,8 +62,7 @@
                            )]
     (when-not (empty? other-colliding-ports)
       (let [combined-ports (conj other-colliding-ports port)]
-        (om/transact! component [`(flowports/combine {:ports ~combined-ports})
-                                 :blocks :accounts])))))
+        (combine-ports! combined-ports)))))
 
 (defn create-account-transaction
   [account]
@@ -50,22 +74,20 @@
 
 ;; -----------------------------------------------------------------------------
 
-(defmulti read om/dispatch)
-
-(defmethod read :default
+(defmethod reader :default
   [{:keys [query state]} k params]
   (let [st @state]
     {:value (om/db->tree query (get st k) st)}))
 
-(defmulti mutate om/dispatch)
+;; -----------------------------------------------------------------------------
 
-(defmethod mutate 'account/create
+(defmethod mutator 'account/create
   [{:keys [state ref]} k {:keys [account]}]
   (let []
     {:action (fn []
                (swap! state (create-account-transaction account)))}))
 
-(defmethod mutate 'flowport/add-to-account
+(defmethod mutator 'flowport/add-to-account
   [{:keys [state]} k {:keys [account port]}]
   (let [account-ref [:account/by-id (:db/id account)]]
     {:action (fn []
@@ -76,34 +98,12 @@
                                    (update :shape #(merge % {:x nil :y nil}))))))}))
 
 
-(defmethod mutate 'flowports/combine
-  [{:keys [state ref component]} k {ports :ports}]
-  (let [st @state
-        num-ports (count ports)
-        divisor {:x num-ports :y num-ports}
-        centroid (as-> ports $
-                      (map :shape $)
-                      (apply merge-with + $)
-                      (merge-with / $ divisor))
-        account-name (-> ports first :flowport/name)
-        account-id (util/rand-uuid)
-        account-ref [:account/by-id account-id]
-        account {:db/id account-id
-                 :account/name account-name
-                 :shape {:x (:x centroid)
-                         :y (:y centroid)
-                         :r 60}}]
-    {:action (fn []
-               (om/transact! component [`(account/create ~{:account account})])
-               (doseq [port ports]
-                 (om/transact! component [`(flowport/add-to-account ~{:account account :port port})])))}))
-
-(defmethod mutate 'gui/start-drag-element
+(defmethod mutator 'gui/start-drag-element
   [{:keys [state ref]} k {:keys [x y] :as xy}]
   {:action #(swap! state assoc :gui/drag {:ref ref
                                           :origin xy})})
 
-(defmethod mutate 'gui/end-drag-element
+(defmethod mutator 'gui/end-drag-element
   [{:keys [state ref component] :as env} k {:keys [x y] :as xy}]
   (let [st @state
         is-flowport? (= :flowport/by-id (first ref))]
@@ -115,7 +115,7 @@
                (swap! state assoc :gui/drag nil)
              )}))
 
-(defmethod mutate 'gui/move-element
+(defmethod mutator 'gui/move-element
   [{:keys [state ref]} k {:keys [x y] :as xy}]
   (let [st @state
         origin  {:x 0 :y 0} ;; #_(get-in st [:gui/drag :origin])
@@ -127,10 +127,7 @@
                                                     (assoc-in [:shape :x] x)
                                                     (assoc-in [:shape :y] y))))}))
 
-(defmethod mutate :default
+(defmethod mutator :default
   [{:keys [state]} k _]
   (js/console.error "invalid mutate key: " k)
   {:action #(js/console.log k)})
-
-(def parser (om/parser {:read read
-                        :mutate mutate}))
