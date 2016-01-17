@@ -28,11 +28,17 @@
   (<= (distance-squared circle1 circle2) (-> (+ r1 r2) square)))
 
 (defn intersect-circle-ray
-  ([circle ray-origin] (intersect-circle-ray circle ray-origin 0))
-  ([{cx :x cy :y r :r :as circle} ray-origin padding]
+  "Find the point of intersection between a circle and a line segment
+  starting at ray-origin and ending at the circle's center"
+  ([circle ray-origin] (intersect-circle-ray circle ray-origin {}))
+  ([{cx :x cy :y r :r :as circle}
+    ray-origin
+    {:keys [radial-offset angular-offset]
+     :or {radial-offset 0
+          angular-offset 0}}]
    (let [{dx :x dy :y} (merge-with - circle ray-origin)
          angle (js/Math.atan2 dy dx)
-         intersect (merge-with - circle (polar->rect (+ r padding) angle))]
+         intersect (merge-with - circle (polar->rect (+ r radial-offset) (+ angle angular-offset)))]
      (select-keys intersect [:x :y]))))
 
 #_(defn intersect-rect-ray  ;; TODO
@@ -45,13 +51,16 @@
 
 (defn spline-string
   [{cx0 :x cy0 :y :as shape1}
-   {cx1 :x cy1 :y :as shape2}]
+   {cx1 :x cy1 :y :as shape2}
+   {:keys [angular-offset]
+    :or {angular-offset 0}
+    :as opts}]
 
   (letfn [(intercept
             [from to arrow?]
             (case (shape-type to)
-              :circle (intersect-circle-ray to from (if arrow? 15 0))
-              :rect (intersect-circle-ray to from (if arrow? 50 35))))]
+              :circle (intersect-circle-ray to from (merge opts {:radial-offset (if arrow? 15 0)}))
+              :rect (intersect-circle-ray to from (merge opts {:radial-offset (if arrow? 50 35)}))))]
     (let [{x0 :x y0 :y} (intercept shape1 shape2 false)
           {x1 :x y1 :y} (intercept shape2 shape1 true)]
       (str "M" x0 " " y0 " C " cx0 " " cy0 ", " cx1 " " cy1 ", " x1 " " y1 "")

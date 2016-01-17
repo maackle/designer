@@ -71,12 +71,13 @@
 
   static om/IQuery
   (query [this]
-         [:db/id :account/name
+         [:db/id :account/name :account/flowports
           {:shape [:x :y :r]}])
 
   Object
   (render [this]
           (let [{shape :shape
+                 flowports :account/flowports
                  :as props} (om/props this)
                 {:keys [x y r]} shape
                 {:keys [svg-node]} (om/get-computed this)
@@ -90,6 +91,13 @@
   )
 
 (def make-account (om/factory Account))
+
+(defn index-of
+  [coll x]
+  (->> coll
+       (map-indexed vector)
+       (filter #(= x (second %)))
+       ffirst))
 
 (defui FlowPort
 
@@ -108,20 +116,34 @@
                   {})
   (render [this]
           (let [{shape :shape
+                 id :db/id
                  rate :flowport/rate
                  type :flowport/type
                  account :flowport/account
                  :as props} (om/props this)
                 {:keys [x y r]} shape
-                {:keys [svg-node block-shape]} (om/get-computed this)
+                {:keys [svg-node block-shape block]} (om/get-computed this)
                 {:keys [radius]} (:block params)
                 {account-shape :shape} account
+                sibling-ids (->> block
+                                 :block/flowports
+                                 (filter #(and account (= account (:flowport/account %))))
+                                 (map :db/id))
+                rank (index-of sibling-ids id)
+                num-siblings (count sibling-ids)
+                angular-offset (if rank
+                                 (/ (- rank (/ num-siblings 2)) num-siblings)
+                                 0)
+                angular-offset (if (= :output type)
+                                 (- angular-offset)
+                                 angular-offset)
+                opts {:angular-offset angular-offset}
                 spline (let [sh (if-not (empty? account)
                                   account-shape
                                   shape)]
                          (case type
-                           :output (geom/spline-string block-shape sh)
-                           :input (geom/spline-string sh block-shape)))
+                           :output (geom/spline-string block-shape sh opts)
+                           :input (geom/spline-string sh block-shape opts)))
                 ]
             (sab/html
               [:g
@@ -156,11 +178,13 @@
     [this]
     (let [{ports :block/flowports
            shape :shape
-           id :db/id} (om/props this)
+           id :db/id
+           :as props} (om/props this)
           {x :x y :y} shape
           {:keys [width height]} (:block params)  ;; todo get directly
           {:keys [svg-node] :as computed} (om/get-computed this)
           computed-props {:block-shape shape
+                          :block props
                           :svg-node svg-node}
           {flowport-offset :offset} (:flowport params)
           num-ports (count ports)]

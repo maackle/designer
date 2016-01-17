@@ -48,6 +48,19 @@
         (om/transact! core/reconciler [`(flowport/add-to-account ~{:account account :port port})
                                        :blocks :accounts])))))
 
+(defn all-ports
+  [st]
+  (let [blocks (om/db->tree (om/get-query components/Block) (get st :blocks) st)
+        ports (mapcat :block/flowports blocks)
+        ]
+    ports))
+
+(defn get-account-flowports
+  [st account]
+  (let [ports (all-ports st)]
+    (filter #(= account (:flowport/account %)) ports))
+  )
+
 (defn- do-port-port-intersections!
   [st component port-ref]
   (let [;; could use: (om/db->tree [{:block/flowports [:shape :flowport/name]}] (get st :blocks) st)
@@ -88,6 +101,16 @@
             (update :accounts conj ref)))))
 
 ;; -----------------------------------------------------------------------------
+
+#_(defmethod reader :accounts
+  [{:keys [query state parser]} k params]
+  (let [st @state
+        accounts (om/db->tree query (get st k) st)
+        accounts' (vec (for [account accounts]
+                    (assoc account
+                      :account/flowports (vec (get-account-flowports st account)))))
+        ]
+    {:value accounts'}))
 
 (defmethod reader :default
   [{:keys [query state]} k params]
