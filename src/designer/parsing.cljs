@@ -16,6 +16,24 @@
   [st root ref]
   (get-in st root))
 
+(defn do-port-port-intersection!
+  [st component port-ref]
+  (let [;; could use: (om/db->tree [{:block/flowports [:shape :flowport/name]}] (get st :blocks) st)
+        port (get-in st port-ref)
+        port-shape (:shape port)
+        blocks (->> st :blocks (resolve-seq st))
+        all-port-refs (->> blocks (mapcat :block/flowports))
+        other-colliding-ports (->> all-port-refs
+                                   (filter (partial not= port-ref))  ;; all port refs that aren't the one just dropped
+                                   (resolve-seq st)
+                                   (filter #(-> %
+                                                :shape
+                                                (geom/circles-collide? port-shape))))]
+    (when-not (empty? other-colliding-ports)
+      (let [combined-ports (inspect (conj other-colliding-ports port))]
+        (om/transact! component [`(account/generate {:ports ~combined-ports})
+                                 :blocks :accounts])))))
+
 (defmulti read om/dispatch)
 
 (defmethod read :default
@@ -51,8 +69,9 @@
                (swap! state assoc-in account-ref account)
                (swap! state update :accounts conj account-ref)
                (doseq [port ports]
-                 (inspect port)
-                 (swap! state update-in [:flowport/by-id (:db/id port)] #(assoc-in % [:flowport/account] account-ref))))}))
+                 (swap! state update-in [:flowport/by-id (:db/id port)] (fn [st](-> st
+                                                                                    (assoc-in [:flowport/account] account-ref)
+                                                                                    (update :shape #(merge % {:x nil :y nil})))))))}))
 
 (defmethod mutate 'gui/start-drag-element
   [{:keys [state ref]} k {:keys [x y] :as xy}]
@@ -65,21 +84,9 @@
         is-flowport? (= :flowport/by-id (first ref))]
     {:action (fn []
                (when is-flowport?
-                 (let [;; could use: (om/db->tree [{:block/flowports [:shape :flowport/name]}] (get st :blocks) st)
-                       port (get-in st ref)
-                       port-shape (:shape port)
-                       blocks (->> st :blocks (resolve-seq st))
-                       all-port-refs (->> blocks (mapcat :block/flowports))
-                       other-colliding-ports (->> all-port-refs
-                                                  (filter (partial not= ref))  ;; all port refs that aren't the one just dropped
-                                                  (resolve-seq st)
-                                                  (filter #(-> %
-                                                               :shape
-                                                               (geom/circles-collide? port-shape))))]
-                   (when-not (empty? other-colliding-ports)
-                     (let [combined-ports (inspect (conj other-colliding-ports port))]
-                       (om/transact! component [`(account/generate {:ports ~combined-ports})
-                                                :blocks :accounts])))))
+                 (when-not
+                   (do-port-port-intersection! st component ref)
+                   #_(do-port-account-intersection! st component ref)))
                (swap! state assoc :gui/drag nil)
              )}))
 

@@ -21,9 +21,11 @@
         (merge-with * $ $)
         (reduce + (vals $))))
 
+(defn square [x] (* x x))
+
 (defn circles-collide?
   [{r1 :r :as circle1} {r2 :r :as circle2}]
-  (<= (distance-squared circle1 circle2) (* r1 r2)))
+  (<= (distance-squared circle1 circle2) (-> (+ r1 r2) square)))
 
 (defn intersect-circle-ray
   ([circle ray-origin] (intersect-circle-ray circle ray-origin 0))

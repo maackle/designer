@@ -157,7 +157,6 @@
     (let [{ports :block/flowports
            shape :shape
            id :db/id} (om/props this)
-
           {x :x y :y} shape
           {:keys [width height]} (:block params)  ;; todo get directly
           {:keys [svg-node] :as computed} (om/get-computed this)
