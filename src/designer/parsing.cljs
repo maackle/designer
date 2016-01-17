@@ -10,27 +10,32 @@
     [designer.macros :refer [inspect inspect-with]]
     ))
 
-(defn resolve-seq [st coll] (map (partial get-in st) coll))
+(defn resolve-refs [st coll] (map (partial get-in st) coll))
 
 (defn get-by-ref
   [st root ref]
   (get-in st root))
+
+(defn filter-colliders
+  "given a collision test function,
+  filter objects by whether their shape collides with given shape"
+  [collide? shape objects]
+  (filter #(->> % :shape (collide? shape)) objects))
 
 (defn do-port-port-intersection!
   [st component port-ref]
   (let [;; could use: (om/db->tree [{:block/flowports [:shape :flowport/name]}] (get st :blocks) st)
         port (get-in st port-ref)
         port-shape (:shape port)
-        blocks (->> st :blocks (resolve-seq st))
-        all-port-refs (->> blocks (mapcat :block/flowports))
-        other-colliding-ports (->> all-port-refs
-                                   (filter (partial not= port-ref))  ;; all port refs that aren't the one just dropped
-                                   (resolve-seq st)
-                                   (filter #(-> %
-                                                :shape
-                                                (geom/circles-collide? port-shape))))]
+        blocks (->> st :blocks (resolve-refs st))
+        other-colliding-ports (->> blocks
+                           (mapcat :block/flowports)
+                           (filter (partial not= port-ref))
+                           (resolve-refs st)
+                           (filter-colliders geom/circles-collide? port-shape)
+                           )]
     (when-not (empty? other-colliding-ports)
-      (let [combined-ports (inspect (conj other-colliding-ports port))]
+      (let [combined-ports (conj other-colliding-ports port)]
         (om/transact! component [`(account/generate {:ports ~combined-ports})
                                  :blocks :accounts])))))
 
