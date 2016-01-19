@@ -13,15 +13,15 @@
                  ]
 
   :plugins [[lein-cljsbuild "1.1.1"]
-            [lein-figwheel "0.5.0-1"]]
+            [lein-figwheel "0.5.0-1"]
+            [lein-garden "0.2.6"]]
 
   :clean-targets ^{:protect false} ["resources/public/js/compiled"
                                     "target"]
 
   :source-paths ["src"]
 
-  :cljsbuild {
-              :builds [{:id "devcards"
+  :cljsbuild {:builds [{:id "devcards"
                         :source-paths ["src"]
                         :figwheel { :devcards true } ;; <- note this
                         :compiler { :main       "designer.cards"
@@ -44,5 +44,16 @@
                                    :output-to  "resources/public/js/compiled/designer.js"
                                    :optimizations :advanced
                                    }}]}
+
+  :garden {:builds [{:id "design"
+                     :source-paths ["src"]
+                     :stylesheet designer.css.style/styles
+                     :compiler {:output-to "resources/public/css/styles.css"
+                                :pretty-print true}}
+                    #_{:id "prod"
+                     :source-paths ["src"]
+                     :stylesheet designer.css.style/styles
+                     :compiler {:output-to "dist/styles.min.css"
+                                :pretty-print? false}}]}
 
   :figwheel { :css-dirs ["resources/public/css"] })

@@ -33,7 +33,7 @@
                        :flowport/account nil
                        :shape {:x 100
                                :y 50
-                               :r 40}}
+                               :r 80}}
                     2 {:db/id 2
                        :flowport/type :output
                        :flowport/name "biogas"
@@ -41,14 +41,14 @@
                        :flowport/account nil
                        :shape {:x 200
                                :y 50
-                               :r 40}}
+                               :r 80}}
                     3 {:db/id 3
                        :flowport/type :output
                        :flowport/name "biogas"
                        :flowport/rate 10
                        :shape {:x 150
                                :y 400
-                               :r 40}}
+                               :r 80}}
                     4 {:db/id 4
                        :flowport/type :input
                        :flowport/name "biomass"
@@ -56,7 +56,7 @@
                        :flowport/account nil
                        :shape {:x 300
                                :y 50
-                               :r 40}}
+                               :r 80}}
                     5 {:db/id 5
                        :flowport/type :output
                        :flowport/name "biogas"
@@ -64,12 +64,12 @@
                        :flowport/account nil
                        :shape {:x 500
                                :y 120
-                               :r 40}}
+                               :r 80}}
                     6 {:db/id 6
                        :flowport/type :output
                        :flowport/name "biogas"
                        :flowport/rate 10
                        :shape {:x 250
                                :y 400
-                               :r 40}}}
+                               :r 80}}}
    })

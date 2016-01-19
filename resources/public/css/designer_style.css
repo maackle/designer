@@ -1,0 +1,52 @@
+/* designer-om CSS */
+
+#main-app-area svg {
+    width: 100%;
+    height: 100%;
+}
+.field {
+    border: 1px solid magenta;
+}
+
+text {
+    user-select: none;
+    pointer-events: none;
+}
+
+text::selection {
+    background: none;
+}
+
+g.block {
+
+}
+
+rect, circle {
+    cursor: pointer;
+}
+
+rect.block {
+    fill: white;
+    stroke: black;
+    stroke-width: 2px;
+}
+
+.flowport {
+    cursor: pointer;
+}
+
+.flowport-shape {
+    fill: white;
+    stroke: black;
+    stroke-width: 2px;
+}
+
+circle.account {
+    fill: white;
+    stroke: black;
+    stroke-width: 2px;
+}
+
+.block path {
+    stroke-width: 10px;
+}

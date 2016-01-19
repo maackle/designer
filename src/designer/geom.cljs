@@ -59,8 +59,8 @@
   (letfn [(intercept
             [from to arrow?]
             (case (shape-type to)
-              :circle (intersect-circle-ray to from (merge opts {:radial-offset (if arrow? 15 0)}))
-              :rect (intersect-circle-ray to from (merge opts {:radial-offset (if arrow? 50 35)}))))]
+              :circle (intersect-circle-ray to from (merge opts {:radial-offset (if arrow? 35 10)}))
+              :rect (intersect-circle-ray to from (merge opts {:radial-offset (if arrow? 70 55)}))))]
     (let [{x0 :x y0 :y} (intercept shape1 shape2 false)
           {x1 :x y1 :y} (intercept shape2 shape1 true)]
       (str "M" x0 " " y0 " C " cx0 " " cy0 ", " cx1 " " cy1 ", " x1 " " y1 "")

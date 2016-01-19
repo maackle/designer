@@ -83,11 +83,14 @@
                 {:keys [svg-node]} (om/get-computed this)
                 ]
             (sab/html
-              [:circle.account
-               {:cx x
-                :cy y
-                :r r
-                :onMouseDown (drag-start-handler svg-node this [:blocks])}])))
+              [:g.account
+               [:text {}
+                "yo"]
+               [:circle.account-shape
+                {:cx x
+                 :cy y
+                 :r r
+                 :onMouseDown (drag-start-handler svg-node this [:blocks])}]])))
   )
 
 (def make-account (om/factory Account))
@@ -107,7 +110,7 @@
 
   static om/IQuery
   (query [this]
-         [:db/id :flowport/rate :flowport/type
+         [:db/id :flowport/rate :flowport/type :flowport/name
           {:flowport/account (om/get-query Account)}
           {:shape [:x :y :r]}])
 
@@ -119,6 +122,7 @@
                  id :db/id
                  rate :flowport/rate
                  type :flowport/type
+                 name :flowport/name
                  account :flowport/account
                  :as props} (om/props this)
                 {:keys [x y r]} shape
@@ -147,18 +151,37 @@
                 ]
             (sab/html
               [:g
-               [:path (merge {:stroke "black"
-                              :fill "transparent"
-                              :marker-end "url(#arrow)"
-                              :d spline}
-                             )]
+               [:path.flow-arrow (merge {:stroke "black"
+                                         :fill "transparent"
+                                         :marker-end "url(#arrow)"
+                                         :d spline}
+                                        )]
+
                (when-not account
-                 [:circle.flowport
-                  {:cx x
-                   :cy y
-                   :r r
-                   :onMouseDown (drag-start-handler svg-node this [])}
-                  ])]))))
+                 [:g.flowport {:transform (str "translate(" x "," y ")")
+                               :onMouseDown (drag-start-handler svg-node this [])}
+                  [:circle.flowport-shape
+                   {:cx 0
+                    :cy 0
+                    :r r
+                    }
+                   ]
+
+                  [:text.flowport-name
+                   {:dy -15
+                    :text-anchor "middle"
+                    :font-size "16px"}
+                   name]
+                  [:text.flowport-rate
+                   {:dy 10
+                    :text-anchor "middle"
+                    :font-size "24px"}
+                   rate]
+                  [:text.flowport-units
+                   {:dy 20
+                    :text-anchor "middle"
+                    :font-size "16px"}
+                   "."]])]))))
 
 (def make-flowport (om/factory FlowPort))
 
@@ -200,11 +223,11 @@
              [:g
               (make-flowport (om/computed port computed-props))
               ]))
-         [:rect.block {:x (+ x (- (/ width 2)))
-                       :y (+ y (- (/ height 2)))
-                       :width width
-                       :height height
-                       }]]))))
+         [:rect.block-shape {:x (+ x (- (/ width 2)))
+                             :y (+ y (- (/ height 2)))
+                             :width width
+                             :height height
+                             }]]))))
 
 (def make-block (om/factory Block))
 
