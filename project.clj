@@ -42,7 +42,7 @@
                         :compiler {:main       "designer.app"
                                    :asset-path "js/compiled/out"
                                    :output-to  "resources/public/js/compiled/designer.js"
-                                   :optimizations :advanced
+                                   :optimizations :simple
                                    }}]}
 
   :garden {:builds [{:id "design"

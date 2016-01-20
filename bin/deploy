@@ -1,0 +1,7 @@
+#!/bin/bash
+
+DESTINATION=lv11.co:sites/michaeldougherty.info/www/terrarium-designer/
+
+lein clean && \
+lein cljsbuild once prod && \
+rsync -av ./resources/public/ $DESTINATION
