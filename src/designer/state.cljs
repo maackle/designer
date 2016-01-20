@@ -1,6 +1,12 @@
 (ns designer.state)
 
+(def sam-state nil)
 
+
+(def constants {:block {:width 200
+                        :height 100}
+                :flowport {:radius 30
+                           :offset 130}})
 
 (def initial-data
   {:gui/drag nil
@@ -12,8 +18,8 @@
                     :block/name "Biodigester"
                     :shape {:x 200
                             :y 200
-                            :width 100
-                            :height 50}
+                            :width (get-in constants [:block :width])
+                            :height (get-in constants [:block :height])}
                     :block/flowports [[:flowport/by-id 1]
                                   [:flowport/by-id 2]
                                   [:flowport/by-id 3]]}
@@ -21,8 +27,8 @@
                     :block/name "Gasifier"
                     :shape {:x 400
                             :y 400
-                            :width 100
-                            :height 50}
+                            :width (get-in constants [:block :width])
+                            :height (get-in constants [:block :height])}
                     :block/flowports [[:flowport/by-id 4]
                                       [:flowport/by-id 5]
                                       [:flowport/by-id 6]]}}

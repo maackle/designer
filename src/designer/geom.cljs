@@ -1,4 +1,5 @@
 (ns designer.geom
+  (:require [designer.state :refer [constants]])
   (:require-macros [designer.macros :refer [inspect]]))
 
 
@@ -56,12 +57,14 @@
     :or {angular-offset 0}
     :as opts}]
 
-  (letfn [(intercept
+  (let [block-dim (/ (+ (get-in constants [:block :width]) (get-in constants [:block :height])) 3)
+        port-radius (get-in constants [:flowport :radius])]
+    (letfn [(intercept
             [from to arrow?]
             (case (shape-type to)
-              :circle (intersect-circle-ray to from (merge opts {:radial-offset (if arrow? 35 10)}))
-              :rect (intersect-circle-ray to from (merge opts {:radial-offset (if arrow? 70 55)}))))]
+              :circle (intersect-circle-ray to from (merge opts {:radial-offset (if arrow? port-radius 0)}))
+              :rect (intersect-circle-ray to from (merge opts {:radial-offset (if arrow? block-dim 0)}))))]
     (let [{x0 :x y0 :y} (intercept shape1 shape2 false)
           {x1 :x y1 :y} (intercept shape2 shape1 true)]
       (str "M" x0 " " y0 " C " cx0 " " cy0 ", " cx1 " " cy1 ", " x1 " " y1 "")
-      )))
+      ))))

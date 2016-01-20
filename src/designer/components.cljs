@@ -5,6 +5,7 @@
     [sablono.core :as sab :include-macros true]
     [designer.util :as util]
     [designer.geom :as geom]
+    [designer.state :refer [constants]]
     [goog.events :as events]
     [goog.dom :as dom])
   (:require-macros
@@ -13,11 +14,6 @@
 
 
 ;; -----------------------------------------------------------------------------
-
-(def params {:block {:width 80
-                     :height 40}
-             :flowport {:radius 30
-                        :offset 130}})
 
 (defn mouse-xy* [e]
   (let []
@@ -127,7 +123,6 @@
                  :as props} (om/props this)
                 {:keys [x y r]} shape
                 {:keys [svg-node block-shape block]} (om/get-computed this)
-                {:keys [radius]} (:block params)
                 {account-shape :shape} account
                 sibling-ids (->> block
                                  :block/flowports
@@ -141,7 +136,7 @@
                 angular-offset (if (= :output type)
                                  (- angular-offset)
                                  angular-offset)
-                opts {:angular-offset angular-offset}
+                opts {:angular-offset 0}
                 spline (let [sh (if-not (empty? account)
                                   account-shape
                                   shape)]
@@ -204,12 +199,12 @@
            id :db/id
            :as props} (om/props this)
           {x :x y :y} shape
-          {:keys [width height]} (:block params)  ;; todo get directly
+          {:keys [width height]} shape
           {:keys [svg-node] :as computed} (om/get-computed this)
           computed-props {:block-shape shape
                           :block props
                           :svg-node svg-node}
-          {flowport-offset :offset} (:flowport params)
+          {flowport-offset :offset} (get-in constants [:flowport :offset])
           num-ports (count ports)]
       (sab/html
         [:g.block {:onMouseDown (drag-start-handler svg-node this [])}
