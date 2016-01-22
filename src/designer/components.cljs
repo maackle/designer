@@ -30,23 +30,26 @@
    (setup-drag-handlers! svg component []))
 
   ([svg component render-keys]
-   (doseq [[down-event move-event up-event] [["mousedown" "mousemove" "mouseup"]
-                                             #_["touchstart" "touchmove" "touchend"]]]
+   (doseq [[down-event move-event up-event] [#_["mousedown" "mousemove" "mouseup"]
+                                             ["touchstart" "touchmove" "touchend"]]]
      (let [node (om.dom/node component)]
        (letfn [(move-handler [e]
                              (doto e .preventDefault .stopPropagation)
-                             (inspect move-event)
                              (let [target (.. e -target)
-                                   xy (mouse-xy svg e)]
-                               (om/transact! component
+                                   {:keys [x y] :as xy} (mouse-xy svg e)
+                                   baseVal (.. node -transform -baseVal)
+                                   xf (. baseVal getItem 0)]
+                               (. xf setTranslate x y)
+                               #_(om/transact! component
                                              (into [] (concat
                                                         [`(gui/move-element ~xy)]
                                                         render-keys)))))
                (up-handler [e]
-                           (om/transact! component
+                           (let [xy (mouse-xy svg e)]
+                             (om/transact! component
                                          (into [] (concat
-                                                    [`(gui/end-drag-element)]
-                                                    render-keys)))
+                                                    [`(gui/end-drag-element ~xy)]
+                                                    render-keys))))
                            (events/unlisten svg move-event move-handler))
                (down-handler [e]
                              (doto e .preventDefault .stopPropagation)
@@ -90,12 +93,12 @@
                 {:keys [svg-node]} (om/get-computed this)
                 ]
             (sab/html
-              [:g.account
+              [:g.account {:transform (str "translate(" x "," y ")")}
                [:text {}
                 "yo"]
                [:circle.account-shape
-                {:cx x
-                 :cy y
+                {:cx 0
+                 :cy 0
                  :r r}]])))
   )
 
@@ -169,7 +172,7 @@
                                         )]
 
                (when-not account
-                 [:g.flowport {:transform (str "translate(" x "," y ")")}
+                 (sab/html [:g.flowport {:transform (str "translate(" x "," y ")")}
                   [:circle.flowport-shape
                    {:cx 0
                     :cy 0
@@ -191,7 +194,7 @@
                    {:dy 20
                     :text-anchor "middle"
                     :font-size "16px"}
-                   "."]])]))))
+                   "."]]))]))))
 
 (def make-flowport (om/factory FlowPort))
 

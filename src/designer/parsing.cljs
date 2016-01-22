@@ -145,10 +145,13 @@
   (let [st @state
         is-flowport? (= :flowport/by-id (first ref))]
     {:action (fn []
+               (swap! state update-in ref #(-> %
+                                               (assoc-in [:shape :x] x)
+                                               (assoc-in [:shape :y] y)))
                (when is-flowport?
                  (when-not
-                   (do-port-port-intersections! st component ref)
-                   (do-port-account-intersection! st component ref)))
+                   (do-port-port-intersections! @state component ref) ;; todo - thread state
+                   (do-port-account-intersection! @state component ref))) ;; todo - thread state
                (swap! state assoc :gui/drag nil)
              )}))
 
@@ -160,7 +163,8 @@
                        (merge-with - xy $)
                        (rename-keys $ {:x :position/x
                                        :y :position/y}))]
-    {:action (fn [] (swap! state update-in ref #(-> %
+    {:action (fn []
+               (swap! state update-in ref #(-> %
                                                     (assoc-in [:shape :x] x)
                                                     (assoc-in [:shape :y] y))))}))
 
