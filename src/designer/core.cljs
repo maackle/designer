@@ -2,7 +2,6 @@
   (:require
    [om.next :as om :include-macros true]
    [sablono.core :as sab :include-macros true]
-   [designer.components :refer [Field]]
    [designer.state :as state])
   (:require-macros
     [designer.macros :refer [inspect inspect-with]]

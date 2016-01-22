@@ -56,4 +56,5 @@
                      :compiler {:output-to "dist/styles.min.css"
                                 :pretty-print? false}}]}
 
-  :figwheel { :css-dirs ["resources/public/css"] })
+  :figwheel {:css-dirs ["resources/public/css"]
+             :server-port 7777})

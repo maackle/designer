@@ -8,6 +8,8 @@
 
 (defstyles app
 
+  [:html :body {:margin 0}]
+
   [:#main-app-area
    [:svg {:width "100%"
           :height "100%"}]]

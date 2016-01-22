@@ -1,7 +1,5 @@
 (ns designer.state)
 
-(def sam-state nil)
-
 
 (def constants {:block {:width 200
                         :height 100}

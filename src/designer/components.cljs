@@ -25,36 +25,40 @@
         left (.. svg -offsetParent -offsetLeft)]
     (merge-with - (mouse-xy* e) {:x left :y top})))
 
-(defn drag-start-handler
-  ([svg component] (drag-start-handler svg component []))
+(defn setup-drag-handlers!
+  ([svg component]
+   (setup-drag-handlers! svg component []))
+
   ([svg component render-keys]
-   (let []
-    (letfn [
-            (move [e]
-                  (. e stopPropagation)
-                  (let [target (.. e -target)
-                        xy (mouse-xy svg e)]
-                    (om/transact! component
-                                  (into [] (concat
-                                             [`(gui/move-element ~xy)]
-                                             render-keys)))))
-            (up [e]
-                (om/transact! component
-                              (into [] (concat
-                                         [`(gui/end-drag-element)]
-                                         render-keys)))
-                (events/unlisten svg "mousemove" move))
-            (down [e]
-                  (. e stopPropagation)
-                  (let [xy (mouse-xy svg e)]
-                    (om/transact! component
-                                  (into [] (concat
-                                             [`(gui/start-drag-element ~xy)]
-                                             render-keys)))
-                    (events/listen svg "mousemove" move)
-                    (events/listenOnce js/document.body "mouseup" up)))
-            ]
-      down))))
+   (doseq [[down-event move-event up-event] [["mousedown" "mousemove" "mouseup"]
+                                             #_["touchstart" "touchmove" "touchend"]]]
+     (let [node (om.dom/node component)]
+       (letfn [(move-handler [e]
+                             (doto e .preventDefault .stopPropagation)
+                             (inspect move-event)
+                             (let [target (.. e -target)
+                                   xy (mouse-xy svg e)]
+                               (om/transact! component
+                                             (into [] (concat
+                                                        [`(gui/move-element ~xy)]
+                                                        render-keys)))))
+               (up-handler [e]
+                           (om/transact! component
+                                         (into [] (concat
+                                                    [`(gui/end-drag-element)]
+                                                    render-keys)))
+                           (events/unlisten svg move-event move-handler))
+               (down-handler [e]
+                             (doto e .preventDefault .stopPropagation)
+                             (let [xy (mouse-xy svg e)]
+                               (om/transact! component
+                                             (into [] (concat
+                                                        [`(gui/start-drag-element ~xy)]
+                                                        render-keys)))
+                               (events/listen svg move-event move-handler)
+                               (events/listenOnce js/document.body up-event up-handler)))
+             ]
+       (events/listen node down-event down-handler))))))
 
 
 ;; -----------------------------------------------------------------------------
@@ -71,6 +75,13 @@
           {:shape [:x :y :r]}])
 
   Object
+  (componentDidMount
+    [this]
+    (let [{:keys [svg-node]} (om/get-computed this)]
+      (setup-drag-handlers! svg-node this [:blocks])))
+
+  ;; TODO: teardown events
+
   (render [this]
           (let [{shape :shape
                  flowports :account/flowports
@@ -85,8 +96,7 @@
                [:circle.account-shape
                 {:cx x
                  :cy y
-                 :r r
-                 :onMouseDown (drag-start-handler svg-node this [:blocks])}]])))
+                 :r r}]])))
   )
 
 (def make-account (om/factory Account))
@@ -113,6 +123,12 @@
   Object
   (initLocalState [_]
                   {})
+
+  (componentDidMount
+    [this]
+    (let [{:keys [svg-node]} (om/get-computed this)]
+      (setup-drag-handlers! svg-node this [:blocks])))
+
   (render [this]
           (let [{shape :shape
                  id :db/id
@@ -153,8 +169,7 @@
                                         )]
 
                (when-not account
-                 [:g.flowport {:transform (str "translate(" x "," y ")")
-                               :onMouseDown (drag-start-handler svg-node this [])}
+                 [:g.flowport {:transform (str "translate(" x "," y ")")}
                   [:circle.flowport-shape
                    {:cx 0
                     :cy 0
@@ -192,6 +207,12 @@
           {:block/flowports (om/get-query FlowPort)}])
 
   Object
+
+  (componentDidMount
+    [this]
+    (let [{:keys [svg-node]} (om/get-computed this)]
+      (setup-drag-handlers! svg-node this [:blocks])))
+
   (render
     [this]
     (let [{ports :block/flowports
@@ -207,7 +228,7 @@
           {flowport-offset :offset} (get-in constants [:flowport :offset])
           num-ports (count ports)]
       (sab/html
-        [:g.block {:onMouseDown (drag-start-handler svg-node this [])}
+        [:g.block
          (for [[i port] (map-indexed vector ports)]
            (let [{x :x y :y} (geom/polar->rect flowport-offset (/ (* 2 js/Math.PI i) num-ports))
                  port (if (:shape/x port)
@@ -242,8 +263,8 @@
                 {:keys [dom-node]} (om/get-state this)
                 ]
             (sab/html
-              [:svg.field {:width 600
-                           :height 600}
+              [:svg.field {:width 900
+                           :height 900}
                [:defs
                 {:dangerouslySetInnerHTML
                  {:__html "
@@ -263,7 +284,8 @@
                           "
                           }}]
 
-               [:g.field
+               (when dom-node ;; don't render if not mounted yet
+                 [:g.field
                 (for [block blocks]
                   (-> block
                       (om/computed {:svg-node dom-node})
@@ -271,6 +293,6 @@
                 (for [account accounts]
                   (-> account
                       (om/computed {:svg-node dom-node})
-                      make-account))]]))))
+                      make-account))])]))))
 
 (def Root Field)
