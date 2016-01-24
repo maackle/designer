@@ -35,8 +35,7 @@
   (letfn [(find-node [node]
                      (as-> (jq/$ node) $
                            (jq/children $ :.drag-handle)
-                           (do (js/console.log $) $)
-                           (if (not= 1 (inspect (.-length $)))
+                           (if (not= 1 (.-length $))
                              (throw "found multiple .drag-handle nodes")
                              (.get $ 0))))]
     (if (.hasClass (jq/$ base-node) "drag-handle")
@@ -48,39 +47,55 @@
    (setup-drag-handlers! svg component []))
 
   ([svg component render-keys]
-   (doseq [[down-event move-event up-event] [["mousedown" "mousemove" "mouseup"]
-                                             #_["touchstart" "touchmove" "touchend"]]]
+
+
      (let [base-node (om.dom/node component)
-           drag-node (get-drag-handle-node base-node)]
-       (letfn [(move-handler [e]
-                             (doto e .preventDefault .stopPropagation)
-                             (let [target (.. e -target)
-                                   {:keys [x y] :as xy} (mouse-xy svg e)
-                                   baseVal (.. drag-node -transform -baseVal)
-                                   xf (. baseVal getItem 0)]
-                               (. xf setTranslate x y)
-                               #_(om/transact! component
-                                             (into [] (concat
-                                                        [`(gui/move-element ~xy)]
-                                                        render-keys)))))
-               (up-handler [e]
-                           (let [xy (mouse-xy svg e)]
-                             (om/transact! component
-                                         (into [] (concat
-                                                    [`(gui/end-drag-element ~xy)]
-                                                    render-keys))))
-                           (events/unlisten svg move-event move-handler))
-               (down-handler [e]
-                             (doto e .preventDefault .stopPropagation)
-                             (let [xy (mouse-xy svg e)]
-                               (om/transact! component
-                                             (into [] (concat
-                                                        [`(gui/start-drag-element ~xy)]
-                                                        render-keys)))
-                               (events/listen svg move-event move-handler)
-                               (events/listenOnce js/document.body up-event up-handler)))
-             ]
-       (events/listen drag-node down-event down-handler))))))
+           drag-node (get-drag-handle-node base-node)
+           handle-mousemove (fn [e]
+                          (doto e .preventDefault .stopPropagation)
+                          (let [target (.. e -target)
+                                {:keys [x y] :as xy} (mouse-xy svg e)
+                                baseVal (.. drag-node -transform -baseVal)
+                                xf (. baseVal getItem 0)]
+                            (. xf setTranslate x y) ))
+           handle-touchmove handle-mousemove
+           handle-mouseup (fn [e]
+                        (doto e .preventDefault .stopPropagation)
+                        (let [xy (mouse-xy svg e)]
+                          (om/transact! component
+                                        (into [] (concat
+                                                   [`(gui/end-drag-element ~xy)]
+                                                   render-keys))))
+                        (events/unlisten svg "mousemove" handle-mousemove))
+           handle-touchend (fn [e]
+                        (doto e .preventDefault .stopPropagation)
+                        (let [xy (mouse-xy svg e)]
+                          (om/transact! component
+                                        (into [] (concat
+                                                   [`(gui/end-drag-element ~xy)]
+                                                   render-keys))))
+                        (events/unlisten svg "touchmove" handle-touchmove))
+           handle-mousedown (fn [e]
+                          (doto e .preventDefault .stopPropagation)
+                          (let [xy (mouse-xy svg e)]
+                            (om/transact! component
+                                          (into [] (concat
+                                                     [`(gui/start-drag-element ~xy)]
+                                                     render-keys)))
+                            (events/listen svg "mousemove" handle-mousemove)
+                            (events/listenOnce js/document.body "mouseup" handle-mouseup)))
+           handle-touchstart (fn [e]
+                            (doto e .preventDefault .stopPropagation)
+                            (let [xy (mouse-xy svg e)]
+                              (om/transact! component
+                                            (into [] (concat
+                                                       [`(gui/start-drag-element ~xy)]
+                                                       render-keys)))
+                              (events/listen svg "touchmove" handle-touchmove)
+                              (events/listenOnce js/document.body "touchend" handle-touchend)))]
+
+         (events/listen drag-node "mousedown" handle-mousedown)
+         (events/listen drag-node "touchstart" handle-touchstart))))
 
 
 ;; -----------------------------------------------------------------------------
