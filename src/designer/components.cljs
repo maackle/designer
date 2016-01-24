@@ -1,7 +1,10 @@
 (ns designer.components
+  #_(:use
+    [jayq.core :only ($ children)])
   (:require
     [om.next :as om  :refer-macros [defui]]
     [om.dom]
+    [jayq.core :as jq]
     [sablono.core :as sab :include-macros true]
     [designer.util :as util]
     [designer.geom :as geom]
@@ -25,19 +28,35 @@
         left (.. svg -offsetParent -offsetLeft)]
     (merge-with - (mouse-xy* e) {:x left :y top})))
 
+(defn get-drag-handle-node
+  "If base-node has class .drag-handle, return it.
+  Else if a single child has the class, return that."
+  [base-node]
+  (letfn [(find-node [node]
+                     (as-> (jq/$ node) $
+                           (jq/children $ :.drag-handle)
+                           (do (js/console.log $) $)
+                           (if (not= 1 (inspect (.-length $)))
+                             (throw "found multiple .drag-handle nodes")
+                             (.get $ 0))))]
+    (if (.hasClass (jq/$ base-node) "drag-handle")
+                        base-node
+                        (find-node base-node))) )
+
 (defn setup-drag-handlers!
   ([svg component]
    (setup-drag-handlers! svg component []))
 
   ([svg component render-keys]
-   (doseq [[down-event move-event up-event] [#_["mousedown" "mousemove" "mouseup"]
-                                             ["touchstart" "touchmove" "touchend"]]]
-     (let [node (om.dom/node component)]
+   (doseq [[down-event move-event up-event] [["mousedown" "mousemove" "mouseup"]
+                                             #_["touchstart" "touchmove" "touchend"]]]
+     (let [base-node (om.dom/node component)
+           drag-node (get-drag-handle-node base-node)]
        (letfn [(move-handler [e]
                              (doto e .preventDefault .stopPropagation)
                              (let [target (.. e -target)
                                    {:keys [x y] :as xy} (mouse-xy svg e)
-                                   baseVal (.. node -transform -baseVal)
+                                   baseVal (.. drag-node -transform -baseVal)
                                    xf (. baseVal getItem 0)]
                                (. xf setTranslate x y)
                                #_(om/transact! component
@@ -61,7 +80,7 @@
                                (events/listen svg move-event move-handler)
                                (events/listenOnce js/document.body up-event up-handler)))
              ]
-       (events/listen node down-event down-handler))))))
+       (events/listen drag-node down-event down-handler))))))
 
 
 ;; -----------------------------------------------------------------------------
@@ -81,7 +100,7 @@
   (componentDidMount
     [this]
     (let [{:keys [svg-node]} (om/get-computed this)]
-      (setup-drag-handlers! svg-node this [:blocks])))
+      (setup-drag-handlers! svg-node this [:blocks :accounts])))
 
   ;; TODO: teardown events
 
@@ -93,7 +112,7 @@
                 {:keys [svg-node]} (om/get-computed this)
                 ]
             (sab/html
-              [:g.account {:transform (str "translate(" x "," y ")")}
+              [:g.account.drag-handle {:transform (str "translate(" x "," y ")")}
                [:text {}
                 "yo"]
                [:circle.account-shape
@@ -141,62 +160,36 @@
                  account :flowport/account
                  :as props} (om/props this)
                 {:keys [x y r]} shape
-                {:keys [svg-node block-shape block]} (om/get-computed this)
-                {account-shape :shape} account
-                sibling-ids (->> block
-                                 :block/flowports
-                                 (filter #(and account (= account (:flowport/account %))))
-                                 (map :db/id))
-                rank (index-of sibling-ids id)
-                num-siblings (count sibling-ids)
-                angular-offset (if rank
-                                 (/ (- rank (/ num-siblings 2)) num-siblings)
-                                 0)
-                angular-offset (if (= :output type)
-                                 (- angular-offset)
-                                 angular-offset)
-                opts {:angular-offset 0}
-                spline (let [sh (if-not (empty? account)
-                                  account-shape
-                                  shape)]
-                         (case type
-                           :output (geom/spline-string block-shape sh opts)
-                           :input (geom/spline-string sh block-shape opts)))
-                ]
+                {:keys [svg-node]} (om/get-computed this) ]
             (sab/html
-              [:g
-               [:path.flow-arrow (merge {:stroke "black"
-                                         :fill "transparent"
-                                         :marker-end "url(#arrow)"
-                                         :d spline}
-                                        )]
-
-               (when-not account
-                 (sab/html [:g.flowport {:transform (str "translate(" x "," y ")")}
-                  [:circle.flowport-shape
-                   {:cx 0
-                    :cy 0
-                    :r r
-                    }
-                   ]
-
-                  [:text.flowport-name
-                   {:dy -15
-                    :text-anchor "middle"
-                    :font-size "16px"}
-                   name]
-                  [:text.flowport-rate
-                   {:dy 10
-                    :text-anchor "middle"
-                    :font-size "24px"}
-                   rate]
-                  [:text.flowport-units
-                   {:dy 20
-                    :text-anchor "middle"
-                    :font-size "16px"}
-                   "."]]))]))))
+              (when-not account
+                [:g.flowport.drag-handle {:transform (str "translate(" x "," y ")")}
+                 [:circle.flowport-shape {:cx 0
+                                          :cy 0
+                                          :r r }]
+                 [:text.flowport-name {:dy -15
+                                       :text-anchor "middle"
+                                       :font-size "16px"}
+                  name]
+                 [:text.flowport-rate {:dy 10
+                                       :text-anchor "middle"
+                                       :font-size "24px"}
+                  rate]
+                 [:text.flowport-units {:dy 20
+                                        :text-anchor "middle"
+                                        :font-size "16px"}
+                  "."]])
+              ))))
 
 (def make-flowport (om/factory FlowPort))
+
+(defn spline-arrow
+  [shape-from shape-to]
+  (let [spline (geom/spline-string shape-from shape-to {})]
+    [:path.flow-arrow {:stroke "black"
+                       :fill "transparent"
+                       :marker-end "url(#arrow)"
+                       :d spline} ] ))
 
 (defui Block
   static om/Ident
@@ -231,24 +224,33 @@
           {flowport-offset :offset} (get-in constants [:flowport :offset])
           num-ports (count ports)]
       (sab/html
-        [:g.block
-         (for [[i port] (map-indexed vector ports)]
-           (let [{x :x y :y} (geom/polar->rect flowport-offset (/ (* 2 js/Math.PI i) num-ports))
-                 port (if (:shape/x port)
-                        port
-                        (assoc port
-                          :shape/x (+ x )
-                          :shape/y (+ y )))]  ;; TODO only do if no position given already
-             [:g
-              (make-flowport (om/computed port computed-props))
-              ]))
-         [:rect.block-shape {:x (+ x (- (/ width 2)))
-                             :y (+ y (- (/ height 2)))
-                             :width width
-                             :height height
-                             }]]))))
+        [:g
+         [:g.flowports
+          (for [port ports]
+            (-> port
+                (om/computed computed-props)
+                make-flowport))]
+         [:g.block.drag-handle {:transform (str "translate(" x "," y ")")}
+
+          [:rect.block-shape {:x (- (/ width 2))
+                              :y (- (/ height 2))
+                              :width width
+                              :height height
+                              }]]]))))
 
 (def make-block (om/factory Block))
+
+(defn block-port-arrow
+  [block port]
+  (let [{block-shape :shape} block
+        {port-type :flowport/type
+         account :flowport/account} port
+        dest-shape (if account
+                     (:shape account)
+                     (:shape port))]
+    (case port-type
+      :output (spline-arrow block-shape dest-shape)
+      :input (spline-arrow dest-shape block-shape))))
 
 (defui Field
 
@@ -263,8 +265,7 @@
 
   (render [this]
           (let [{:keys [blocks accounts]} (om/props this)
-                {:keys [dom-node]} (om/get-state this)
-                ]
+                {:keys [dom-node]} (om/get-state this) ]
             (sab/html
               [:svg.field {:width 900
                            :height 900}
@@ -289,13 +290,22 @@
 
                (when dom-node ;; don't render if not mounted yet
                  [:g.field
-                (for [block blocks]
-                  (-> block
-                      (om/computed {:svg-node dom-node})
-                      make-block) )
-                (for [account accounts]
-                  (-> account
-                      (om/computed {:svg-node dom-node})
-                      make-account))])]))))
+                  [:g.arrows
+                   (for [block blocks port (:block/flowports block)]
+                     (block-port-arrow block port))
+                   ]
+                  [:g.blocks
+                   (for [block blocks]
+                     (-> block
+                         (om/computed {:svg-node dom-node})
+                         make-block) )]
+                  #_[:g.flowports
+                   (for [block blocks port (:block/flowports block)]
+                     )]
+                  [:g.accounts
+                   (for [account accounts]
+                     (-> account
+                         (om/computed {:svg-node dom-node})
+                         make-account))]])]))))
 
 (def Root Field)

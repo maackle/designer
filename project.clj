@@ -8,6 +8,7 @@
                  [org.clojure/clojurescript "1.7.170"]
                  [devcards "0.2.1-4"]
                  [sablono "0.4.0"]
+                 [jayq "2.5.4"]
                  [org.omcljs/om "1.0.0-alpha26"]
                  [com.lucasbradstreet/cljs-uuid-utils "1.0.2"]
                  ]
