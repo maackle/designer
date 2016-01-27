@@ -47,8 +47,6 @@
    (setup-drag-handlers! svg component []))
 
   ([svg component render-keys]
-
-
      (let [base-node (om.dom/node component)
            drag-node (get-drag-handle-node base-node)
            handle-mousemove (fn [e]
