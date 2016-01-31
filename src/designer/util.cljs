@@ -55,3 +55,11 @@
                    (put! ch res)
                    (close! ch))))
      ch)))
+
+
+(defn keywordize-deep
+  [m]
+  (into {}
+        (for [[k v] m]
+          [(keyword k)
+           (if (map? v) (keywordize-deep v) v)])))

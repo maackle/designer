@@ -11,6 +11,7 @@
                  [jayq "2.5.4"]
                  [org.omcljs/om "1.0.0-alpha26"]
                  [com.lucasbradstreet/cljs-uuid-utils "1.0.2"]
+                 [cljsjs/js-yaml "3.3.1-0"]
                  ]
 
   :plugins [[lein-cljsbuild "1.1.1"]

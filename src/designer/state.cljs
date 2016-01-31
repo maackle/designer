@@ -1,4 +1,6 @@
-(ns designer.state)
+(ns designer.state
+  (:require
+            [cljs.pprint :as pprint]))
 
 
 (def constants {:block {:width 200
@@ -8,9 +10,10 @@
 
 (def initial-data
   {:gui/drag nil
-   :blocks [[:block/by-id 1]
-            [:block/by-id 2]]
-   :accounts []
+   :field {
+           :blocks [[:block/by-id 1]
+                    [:block/by-id 2]]
+           :accounts []}
    :account/by-id {}
    :block/by-id {1 {:db/id 1
                     :block/name "Biodigester"

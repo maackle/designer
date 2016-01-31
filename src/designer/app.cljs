@@ -18,7 +18,7 @@
   (if-let [node (.getElementById js/document "main-app-area")]
     (om/add-root!
       core/reconciler
-      components/Field
+      components/Root
       node
       )))
 

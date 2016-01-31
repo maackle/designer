@@ -255,6 +255,7 @@
 
 (defn block-port-arrow
   [block port]
+  (inspect port)
   (let [{block-shape :shape} block
         {port-type :flowport/type
          account :flowport/account} port
@@ -321,4 +322,20 @@
                          (om/computed {:svg-node dom-node})
                          make-account))]])]))))
 
-(def Root Field)
+(def make-field (om/factory Field))
+
+(defui Root
+
+  static om/IQueryParams
+  (params [_]
+          {:url "blox.yml"})
+
+  static om/IQuery
+  (query [_]
+         `[({:field ~(om/get-query Field)} {:url ?url})])
+
+  Object
+  (render [this]
+          (let [{:keys [field]} (om/props this)]
+            (make-field field))))
+

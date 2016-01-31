@@ -113,8 +113,15 @@
 
 (defmethod reader :default
   [{:keys [query state]} k params]
+  (inspect k)
   (let [st @state]
     {:value (om/db->tree query (get st k) st)}))
+
+(defmethod reader :field
+  [{:keys [query state ast]} k {:keys [url]}]
+  (let [st @state]
+    {:value (om/db->tree query (get st k) st)
+     :remote/state ast}))
 
 ;; -----------------------------------------------------------------------------
 

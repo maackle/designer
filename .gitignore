@@ -1,3 +1,4 @@
 figwheel_server.log
 target/
 compiled/
+.lein-repl-history
