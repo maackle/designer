@@ -9,9 +9,10 @@
                  [devcards "0.2.1-4"]
                  [sablono "0.4.0"]
                  [jayq "2.5.4"]
-                 [org.omcljs/om "1.0.0-alpha26"]
+                 [org.omcljs/om "1.0.0-alpha30"]
                  [com.lucasbradstreet/cljs-uuid-utils "1.0.2"]
                  [cljsjs/js-yaml "3.3.1-0"]
+                 [prismatic/schema "1.0.4"]
                  ]
 
   :plugins [[lein-cljsbuild "1.1.1"]

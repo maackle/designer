@@ -28,11 +28,12 @@
         left (.. svg -offsetParent -offsetLeft)]
     (merge-with - (mouse-xy* e) {:x left :y top})))
 
-(defn get-drag-handle-node
+#_(defn get-drag-handle-node
   "If base-node has class .drag-handle, return it.
   Else if a single child has the class, return that."
   [base-node]
   (letfn [(find-node [node]
+                     (js/console.log node)
                      (as-> (jq/$ node) $
                            (jq/children $ :.drag-handle)
                            (if (not= 1 (.-length $))
@@ -44,11 +45,14 @@
 
 (defn setup-drag-handlers!
   ([svg component]
-   (setup-drag-handlers! svg component []))
+   (setup-drag-handlers! svg component nil []))
 
-  ([svg component render-keys]
-     (let [base-node (om.dom/node component)
-           drag-node (get-drag-handle-node base-node)
+  ([svg component handle-selector render-keys]
+     (if-let [base-node (om.dom/node component)]
+       (let [
+           drag-node (if handle-selector
+                       (-> base-node jq/$ (jq/find handle-selector) (.get 0))
+                       base-node)
            handle-mousemove (fn [e]
                           (doto e .preventDefault .stopPropagation)
                           (let [target (.. e -target)
@@ -93,7 +97,8 @@
                               (events/listenOnce js/document.body "touchend" handle-touchend)))]
 
          (events/listen drag-node "mousedown" handle-mousedown)
-         (events/listen drag-node "touchstart" handle-touchstart))))
+         (events/listen drag-node "touchstart" handle-touchstart))
+       (js/console.warn "missing node"))))
 
 
 ;; -----------------------------------------------------------------------------
@@ -113,7 +118,7 @@
   (componentDidMount
     [this]
     (let [{:keys [svg-node]} (om/get-computed this)]
-      (setup-drag-handlers! svg-node this [:blocks :accounts])))
+      (setup-drag-handlers! svg-node this nil [:blocks :accounts])))
 
   ;; TODO: teardown events
 
@@ -162,7 +167,7 @@
   (componentDidMount
     [this]
     (let [{:keys [svg-node]} (om/get-computed this)]
-      (setup-drag-handlers! svg-node this [:blocks])))
+      (setup-drag-handlers! svg-node this nil [:blocks])))
 
   (render [this]
           (let [{shape :shape
@@ -176,7 +181,8 @@
                 {:keys [svg-node]} (om/get-computed this) ]
             (sab/html
               (when-not account
-                [:g.flowport.drag-handle {:transform (str "translate(" x "," y ")")}
+                [:g.flowport.drag-handle {:transform (str "translate(" x "," y ")")
+                                          :key id}
                  [:circle.flowport-shape {:cx 0
                                           :cy 0
                                           :r r }]
@@ -197,12 +203,14 @@
 (def make-flowport (om/factory FlowPort))
 
 (defn spline-arrow
-  [shape-from shape-to]
-  (let [spline (geom/spline-string shape-from shape-to {})]
-    [:path.flow-arrow {:stroke "black"
-                       :fill "transparent"
-                       :marker-end "url(#arrow)"
-                       :d spline} ] ))
+  [from to & [extra-props]]
+  (let [spline (geom/spline-string (:shape from) (:shape to) {})]
+    [:path.flow-arrow (merge
+                        {:stroke "black"
+                         :fill "transparent"
+                         :marker-end "url(#arrow)"
+                         :d spline }
+                        extra-props) ] ))
 
 (defui Block
   static om/Ident
@@ -220,7 +228,7 @@
   (componentDidMount
     [this]
     (let [{:keys [svg-node]} (om/get-computed this)]
-      (setup-drag-handlers! svg-node this [:blocks])))
+      (setup-drag-handlers! svg-node this ".block.drag-handle" [:blocks])))
 
   (render
     [this]
@@ -237,7 +245,7 @@
           {flowport-offset :offset} (get-in constants [:flowport :offset])
           num-ports (count ports)]
       (sab/html
-        [:g
+        [:g.block-and-ports {:key id}
          [:g.flowports
           (for [port ports]
             (-> port
@@ -255,16 +263,17 @@
 
 (defn block-port-arrow
   [block port]
-  (inspect port)
   (let [{block-shape :shape} block
         {port-type :flowport/type
          account :flowport/account} port
-        dest-shape (if account
-                     (:shape account)
-                     (:shape port))]
-    (case port-type
-      :output (spline-arrow block-shape dest-shape)
-      :input (spline-arrow dest-shape block-shape))))
+        dest (if account
+                     account
+                     port)
+        [from to] (case port-type
+                    :output [block dest]
+                    :input [dest block])
+        arrow-key (str "arrow-" (:db/id from) "--" (:db/id to))]
+    (spline-arrow from to {:key arrow-key})))
 
 (defui Field
 
@@ -279,7 +288,7 @@
 
   (render [this]
           (let [{:keys [blocks accounts]} (om/props this)
-                {:keys [dom-node]} (om/get-state this) ]
+                {:keys [dom-node]} (om/get-state this)]
             (sab/html
               [:svg.field {:width 900
                            :height 900}

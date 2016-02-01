@@ -8,7 +8,8 @@
   (:require-macros
     [cljs.core.async.macros :refer [go alt!]])
   (:import [goog Uri]
-           [goog.net Jsonp]))
+           [goog.net Jsonp]
+           [goog.crypt Sha256]))
 
 (def sym->str (comp #(subs % 1) str))
 
@@ -56,6 +57,14 @@
                    (close! ch))))
      ch)))
 
+(defn sha-256 [s]
+  (let [sha (Sha256.)
+        _   (.update sha s)]
+    (gcrypt/byteArrayToHex (.digest sha))))
+
+(defn sha-hash
+  [x]
+  (.substring (sha-256 x) 0 16))
 
 (defn keywordize-deep
   [m]

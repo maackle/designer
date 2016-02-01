@@ -28,21 +28,30 @@
   [c]
   (go
     (loop [[url cb] (<! c)]
-      (let [yaml (<! (util/http-get url))
-            tree {:field (importer/yaml->state yaml)}
-            db (om/tree->db components/Root tree true) ]
-        (cb db)))))
+      (let [data (<! (util/http-get url))
+            tree {:field (importer/yaml->state data)}
+            db (om/tree->db components/Root tree true)
+            cache {:cache {url url}}
+            novelty (merge db cache)]
+        (cb novelty) ;; TODO: clean up this caching
+        ))))
 
 (state-loop state-chan)
 
 (defn sender
   [remotes cb]
-  (let [url (-> (:remote/state remotes)
-                first
-                second
-                :url)
-        ]
-    (put! state-chan [url cb])))
+  (doseq [[k ast] remotes]
+    (case k
+      :remote/state
+      (let [url (-> ast
+                    first
+                    second
+                    :url)
+            ]
+        (put! state-chan [url cb]))
+
+      :remote/some-other-remote nil
+      )))
 
 (def parser (om/parser {:read reader
                         :mutate mutator}))

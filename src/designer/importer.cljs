@@ -24,7 +24,8 @@
    :block/flowports [nil yaml-flowport-schema add-shape add-uuid]})
 
 (def yaml-schema
-  {"blocks" [:blocks yaml-block-schema add-shape add-uuid]})
+  {"blocks" [:blocks yaml-block-schema add-shape add-uuid]
+   "accounts" [:accounts #(if % % [])]})
 
 (defn- wrap-singleton [x] (if-not (sequential? x) [x] x))
 

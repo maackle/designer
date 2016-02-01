@@ -7,10 +7,36 @@
    [designer.components :as components]
    [designer.core :as core :refer [reader mutator]]
    [designer.util :as util]
-   [designer.geom :as geom])
+   [designer.geom :as geom]
+   [schema.core :as s :include-macros true])
   (:require-macros
     [designer.macros :refer [inspect inspect-with]]
     ))
+
+(defn maybes
+  [m]
+  (into {}
+        (for [[k v] m]
+          [(s/maybe k) v])))
+
+(defn optionals
+  [ks]
+  (into {}
+        (for [k ks]
+          [(s/optional-key k) s/Any])))
+
+(def State
+  (merge
+    {:field {:blocks [s/Any]
+             :accounts [s/Any]}
+     :account/by-id {s/Any s/Any}
+     :block/by-id {s/Any s/Any}
+     :flowport/by-id {s/Any s/Any}
+     }
+    (optionals [:gui/drag
+                :om.next/tables
+                :om.next/queries
+                :cache])))
 
 (defn resolve-refs [st coll] (map (partial get-in st) coll))
 
@@ -43,10 +69,10 @@
                          :r 60}}]
     (do
       (om/transact! core/reconciler [`(account/create ~{:account account})
-                                     :blocks :accounts])
+                                     ])
       (doseq [port ports]
         (om/transact! core/reconciler [`(flowport/add-to-account ~{:account account :port port})
-                                       :blocks :accounts])))))
+                                       ])))))
 
 (defn all-ports
   [st]
@@ -66,7 +92,7 @@
   (let [;; could use: (om/db->tree [{:block/flowports [:shape :flowport/name]}] (get st :blocks) st)
         port (get-in st port-ref)
         port-shape (:shape port)
-        blocks (->> st :blocks (resolve-refs st))
+        blocks (->> st :field :blocks (resolve-refs st))
         other-colliding-ports (->> blocks
                            (mapcat :block/flowports)
                            (filter (partial not= port-ref))
@@ -81,7 +107,7 @@
   [st component port-ref]
   (let [port (get-in st port-ref)
         port-shape (:shape port)
-        accounts (->> st :accounts (resolve-refs st))
+        accounts (->> st :field :accounts (resolve-refs st))
         colliding-accounts (->> accounts
                                 (filter-colliders geom/circles-collide? port-shape)
                                 )]
@@ -89,15 +115,15 @@
       (let [[account] colliding-accounts]
         (om/transact! component [`(flowport/add-to-account ~{:account account
                                                             :port port})
-                                 ])))))
+                                 :accounts])))))
 
 (defn- create-account-transaction
   [account]
   (let [ref [:account/by-id (:db/id account)]]
     (fn [st]
-        (-> st
-            (assoc-in ref account)
-            (update :accounts conj ref)))))
+      (-> st
+          (assoc-in ref account)
+          (update-in [:field :accounts] conj ref)))))
 
 ;; -----------------------------------------------------------------------------
 
@@ -113,15 +139,20 @@
 
 (defmethod reader :default
   [{:keys [query state]} k params]
-  (inspect k)
-  (let [st @state]
-    {:value (om/db->tree query (get st k) st)}))
+  (let [st @state
+        v (om/db->tree query (get st k) st)]
+    {:value v}))
 
 (defmethod reader :field
   [{:keys [query state ast]} k {:keys [url]}]
-  (let [st @state]
-    {:value (om/db->tree query (get st k) st)
-     :remote/state ast}))
+  (let [st @state
+        vv (om/db->tree query (get st k) st)]
+    (inspect (keys st))
+    (s/validate State st)
+    (merge
+      {:value (om/db->tree query (get st k) st)}
+      (when-not (get-in st [:cache url])
+        {:remote/state true}))))
 
 ;; -----------------------------------------------------------------------------
 
