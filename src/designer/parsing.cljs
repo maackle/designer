@@ -147,7 +147,6 @@
   [{:keys [query state ast]} k {:keys [url]}]
   (let [st @state
         vv (om/db->tree query (get st k) st)]
-    (inspect (keys st))
     (s/validate State st)
     (merge
       {:value (om/db->tree query (get st k) st)}

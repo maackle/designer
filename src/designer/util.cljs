@@ -57,12 +57,12 @@
                    (close! ch))))
      ch)))
 
-(defn sha-256 [s]
+#_(defn sha-256 [s]
   (let [sha (Sha256.)
         _   (.update sha s)]
     (gcrypt/byteArrayToHex (.digest sha))))
 
-(defn sha-hash
+#_(defn sha-hash
   [x]
   (.substring (sha-256 x) 0 16))
 
@@ -72,3 +72,20 @@
         (for [[k v] m]
           [(keyword k)
            (if (map? v) (keywordize-deep v) v)])))
+
+
+(defn index-of
+  [coll x]
+  (->> coll
+       (map-indexed vector)
+       (filter #(= x (second %)))
+       ffirst))
+
+
+(defn arrow-ref
+  [block port]
+  (let [block-id (:db/id block)
+        port-id (:db/id port)]
+    (if-not (and block-id port-id)
+    (js/console.error "arrow-ref called with missing block or port" block-id port-id)
+    (str "arrow-" block-id "--" port-id))))
